@@ -426,36 +426,39 @@ const createBilingualClient = (dependencies = {}) => {
 
         cache.delete(key);
         cache.set(key, entry);
-        return entry.metadata;
+        return {
+            metadata: entry.metadata,
+            expiresAt: entry.expiresAt,
+        };
     };
 
     const writeCache = (key, metadata) => {
         if (metadata.matchStatus !== 'matched' && metadata.matchStatus !== 'unmatched') {
-            return;
+            return null;
         }
 
         const fetchedAt = getFetchedAt(metadata);
         const now = safeNow();
         if (fetchedAt === null || fetchedAt > now + CLOCK_SKEW_LIMIT) {
-            return;
+            return null;
         }
 
         const ttl = metadata.matchStatus === 'unmatched' ? UNMATCHED_TTL : SUCCESS_TTL;
         const expiresAt = fetchedAt + ttl;
         if (expiresAt <= now) {
-            return;
+            return null;
         }
 
         let serialized;
         try {
             serialized = JSON.stringify(metadata);
         } catch {
-            return;
+            return null;
         }
 
         const bytes = getUtf8ByteLength(serialized);
         if (bytes > MAX_CACHE_BYTES) {
-            return;
+            return null;
         }
 
         removeCacheEntry(key);
@@ -474,13 +477,16 @@ const createBilingualClient = (dependencies = {}) => {
 
             removeCacheEntry(oldestKey);
         }
+
+        return expiresAt;
     };
 
-    const notify = (subscription, result) => {
+    const notify = (subscription, result, expiresAt = null) => {
         if (!subscription.active) {
             return;
         }
 
+        subscription.readyExpiresAt = result.status === 'ready' && Number.isFinite(expiresAt) ? expiresAt : null;
         try {
             subscription.onChange(result);
         } catch {
@@ -680,6 +686,7 @@ const createBilingualClient = (dependencies = {}) => {
 
     const runTask = async (task) => {
         let result;
+        let resultExpiresAt = null;
 
         try {
             const metadata = await executeFetch(task.identity, (controller) => {
@@ -695,7 +702,7 @@ const createBilingualClient = (dependencies = {}) => {
             } else if (!serverIsAvailable()) {
                 result = availabilityResult();
             } else {
-                writeCache(task.key, metadata);
+                resultExpiresAt = writeCache(task.key, metadata);
                 result = toResult(metadata);
             }
         } catch (error) {
@@ -727,7 +734,7 @@ const createBilingualClient = (dependencies = {}) => {
         }
 
         task.resolve(result);
-        Array.from(task.listeners).forEach((subscription) => notify(subscription, result));
+        Array.from(task.listeners).forEach((subscription) => notify(subscription, result, resultExpiresAt));
         detachTask(task);
     };
 
@@ -776,6 +783,21 @@ const createBilingualClient = (dependencies = {}) => {
         return task;
     };
 
+    const hasExpiredReadySubscription = (key) => {
+        const now = safeNow();
+        return Array.from(subscriptions).some((subscription) => subscription.active && subscription.started && subscription.key === key && subscription.task === null && Number.isFinite(subscription.readyExpiresAt) && subscription.readyExpiresAt <= now);
+    };
+
+    const addSubscriptionToTask = (subscription, task) => {
+        if (subscription.task === task) {
+            return;
+        }
+
+        task.listeners.add(subscription);
+        subscription.task = task;
+        notify(subscription, { metadata: null, status: 'loading' });
+    };
+
     const startSubscription = (subscription, force = false) => {
         if (!subscription.active || !subscription.identity.valid) {
             return;
@@ -811,10 +833,11 @@ const createBilingualClient = (dependencies = {}) => {
             return;
         }
 
-        if (!force) {
+        const hasExpiredReady = hasExpiredReadySubscription(subscription.key);
+        if (!force && !hasExpiredReady) {
             const cached = readCache(subscription.key);
             if (cached) {
-                notify(subscription, toResult(cached));
+                notify(subscription, toResult(cached.metadata), cached.expiresAt);
                 return;
             }
         }
@@ -830,9 +853,15 @@ const createBilingualClient = (dependencies = {}) => {
             }
         }
 
-        task.listeners.add(subscription);
-        subscription.task = task;
-        notify(subscription, { metadata: null, status: 'loading' });
+        addSubscriptionToTask(subscription, task);
+        if (hasExpiredReady) {
+            const now = safeNow();
+            Array.from(subscriptions).forEach((otherSubscription) => {
+                if (otherSubscription !== subscription && otherSubscription.active && otherSubscription.started && otherSubscription.key === subscription.key && otherSubscription.task === null && Number.isFinite(otherSubscription.readyExpiresAt) && otherSubscription.readyExpiresAt <= now) {
+                    addSubscriptionToTask(otherSubscription, task);
+                }
+            });
+        }
         if (createNewTask) {
             enqueue(task);
         }
@@ -847,6 +876,7 @@ const createBilingualClient = (dependencies = {}) => {
             identity: normalized,
             key: normalized.valid ? getRequestKey(normalized) : null,
             priority,
+            readyExpiresAt: null,
             task: null,
             onChange: typeof options.onChange === 'function' ? options.onChange : () => undefined,
         };
@@ -920,8 +950,22 @@ const createBilingualClient = (dependencies = {}) => {
         });
     };
 
+    const restartExpiredSubscriptions = () => {
+        if (stopped || !serverIsAvailable()) {
+            return;
+        }
+
+        const now = safeNow();
+        Array.from(subscriptions).forEach((subscription) => {
+            if (subscription.active && subscription.started && subscription.task === null && Number.isFinite(subscription.readyExpiresAt) && subscription.readyExpiresAt <= now) {
+                startSubscription(subscription, true);
+            }
+        });
+    };
+
     const applyHealth = (health) => {
-        const generationChanged = hasHealthSnapshot && observedGeneration !== health.releaseSha;
+        const hadHealthSnapshot = hasHealthSnapshot;
+        const generationChanged = hadHealthSnapshot && observedGeneration !== health.releaseSha;
         observedGeneration = health.releaseSha;
         hasHealthSnapshot = true;
 
@@ -944,6 +988,8 @@ const createBilingualClient = (dependencies = {}) => {
         serverAvailabilityReason = null;
         if (!wasAvailable || generationChanged) {
             restartStartedSubscriptions();
+        } else if (hadHealthSnapshot && !generationChanged) {
+            restartExpiredSubscriptions();
         }
 
         return { status: 'available', configured: true, enabled: true, releaseSha: health.releaseSha };

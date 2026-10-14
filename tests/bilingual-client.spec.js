@@ -629,6 +629,163 @@ describe('bilingual availability gate', () => {
         expect(browserDocument.removeEventListener).toHaveBeenCalledTimes(1);
     });
 
+    test('refreshes subscribed matched and unmatched results only after their own TTL', async () => {
+        let now = TEST_NOW;
+        const matchedIdentity = { type: 'movie', id: 'tt1234567', scope: 'meta' };
+        const matchedV1 = metadataFor(matchedIdentity);
+        const matchedV2 = metadataFor(matchedIdentity, { fetchedAt: new Date(TEST_NOW + 1000).toISOString() });
+        const matchedFetch = jest.fn()
+            .mockResolvedValueOnce(response(matchedV1))
+            .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'matched-release' }))
+            .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'matched-release' }))
+            .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'matched-release' }))
+            .mockResolvedValueOnce(response(matchedV2));
+        const matchedClient = createBilingualClient({ fetch: matchedFetch, clock: () => now });
+        const matchedChanges = [];
+        const matchedSubscription = matchedClient.subscribe(matchedIdentity, { onChange: (result) => matchedChanges.push(result) });
+
+        await flush();
+        await flush();
+        expect(matchedChanges.at(-1)).toMatchObject({ status: 'ready', metadata: matchedV1 });
+        await matchedClient.checkAvailability();
+        now = TEST_NOW + (24 * 60 * 60 * 1000) - 1;
+        await matchedClient.checkAvailability();
+        expect(matchedFetch).toHaveBeenCalledTimes(3);
+        now += 1;
+        await matchedClient.checkAvailability();
+        await flush();
+        await flush();
+        expect(matchedFetch).toHaveBeenCalledTimes(5);
+        expect(matchedChanges.at(-1)).toMatchObject({ status: 'ready', metadata: matchedV2 });
+        matchedSubscription.cancel();
+
+        now = TEST_NOW;
+        const unmatchedIdentity = { type: 'movie', id: 'tt1234568', scope: 'meta' };
+        const unmatchedV1 = metadataFor(unmatchedIdentity, {
+            matchStatus: 'unmatched',
+            identity: { stremioType: unmatchedIdentity.type, stremioId: unmatchedIdentity.id, tmdbId: null },
+            title: { en: missing('en-US'), zh: missing('zh-CN') },
+            overview: { en: missing('en-US'), zh: missing('zh-CN') },
+        });
+        const unmatchedV2 = { ...unmatchedV1, fetchedAt: new Date(TEST_NOW + 1000).toISOString() };
+        const unmatchedFetch = jest.fn()
+            .mockResolvedValueOnce(response(unmatchedV1))
+            .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'unmatched-release' }))
+            .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'unmatched-release' }))
+            .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'unmatched-release' }))
+            .mockResolvedValueOnce(response(unmatchedV2));
+        const unmatchedClient = createBilingualClient({ fetch: unmatchedFetch, clock: () => now });
+        const unmatchedChanges = [];
+        const unmatchedSubscription = unmatchedClient.subscribe(unmatchedIdentity, { onChange: (result) => unmatchedChanges.push(result) });
+
+        await flush();
+        await flush();
+        expect(unmatchedChanges.at(-1)).toMatchObject({ status: 'ready', metadata: unmatchedV1 });
+        await unmatchedClient.checkAvailability();
+        now = TEST_NOW + (30 * 60 * 1000) - 1;
+        await unmatchedClient.checkAvailability();
+        expect(unmatchedFetch).toHaveBeenCalledTimes(3);
+        now += 1;
+        await unmatchedClient.checkAvailability();
+        await flush();
+        await flush();
+        expect(unmatchedFetch).toHaveBeenCalledTimes(5);
+        expect(unmatchedChanges.at(-1)).toMatchObject({ status: 'ready', metadata: unmatchedV2 });
+        unmatchedSubscription.cancel();
+    });
+
+    test('converges multiple expired same-key subscriptions and a new request into one refresh', async () => {
+        let now = TEST_NOW;
+        const identity = { type: 'series', id: 'tt1234567', scope: 'meta' };
+        const first = metadataFor(identity);
+        const second = metadataFor(identity, { fetchedAt: new Date(TEST_NOW + 1000).toISOString() });
+        let resolveRefresh;
+        const fetch = jest.fn()
+            .mockResolvedValueOnce(response(first))
+            .mockImplementationOnce(() => new Promise((resolve) => {
+                resolveRefresh = resolve;
+            }));
+        const client = createBilingualClient({ fetch, clock: () => now });
+        const firstChanges = [];
+        const secondChanges = [];
+        const firstSubscription = client.subscribe(identity, { onChange: (result) => firstChanges.push(result) });
+        const secondSubscription = client.subscribe(identity, { onChange: (result) => secondChanges.push(result) });
+
+        await flush();
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(firstChanges.at(-1)).toMatchObject({ status: 'ready', metadata: first });
+        expect(secondChanges.at(-1)).toMatchObject({ status: 'ready', metadata: first });
+
+        now = TEST_NOW + (24 * 60 * 60 * 1000);
+        const refreshedRequest = client.request(identity);
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(2);
+        resolveRefresh(response(second));
+        await expect(refreshedRequest).resolves.toEqual({ metadata: second, status: 'ready' });
+        await flush();
+        expect(firstChanges.at(-1)).toMatchObject({ status: 'ready', metadata: second });
+        expect(secondChanges.at(-1)).toMatchObject({ status: 'ready', metadata: second });
+        firstSubscription.cancel();
+        secondSubscription.cancel();
+    });
+
+    test('does not health-retry results without an actual cache expiry', async () => {
+        const cases = [
+            {
+                id: 'tt1234567',
+                response: response({ error: 'temporary' }, { status: 503 }),
+            },
+            {
+                id: 'tt1234568',
+                response: response(metadataFor({ type: 'movie', id: 'tt1234568', scope: 'meta' }, {
+                    matchStatus: 'ambiguous',
+                    identity: { stremioType: 'movie', stremioId: 'tt1234568', tmdbId: null },
+                    title: { en: missing('en-US'), zh: missing('zh-CN') },
+                    overview: { en: missing('en-US'), zh: missing('zh-CN') },
+                })),
+            },
+            {
+                id: 'tt1234569',
+                response: response(metadataFor({ type: 'movie', id: 'tt1234569', scope: 'meta' }, {
+                    fetchedAt: new Date(TEST_NOW + CLOCK_SKEW_LIMIT + 1).toISOString(),
+                })),
+            },
+            {
+                id: 'tt1234570',
+                response: response(metadataFor({ type: 'movie', id: 'tt1234570', scope: 'meta' }, {
+                    title: {
+                        en: available('en-US', '中'.repeat(MAX_TEXT_LENGTH)),
+                        zh: available('zh-CN', '中'.repeat(MAX_TEXT_LENGTH)),
+                    },
+                    overview: {
+                        en: available('en-US', '中'.repeat(MAX_TEXT_LENGTH)),
+                        zh: available('zh-CN', '中'.repeat(MAX_TEXT_LENGTH)),
+                    },
+                })),
+            },
+        ];
+
+        for (const entry of cases) {
+            const identity = { type: 'movie', id: entry.id, scope: 'meta' };
+            const fetch = jest.fn()
+                .mockResolvedValueOnce(entry.response)
+                .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'stable-release' }))
+                .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'stable-release' }))
+                .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'stable-release' }));
+            const client = createBilingualClient({ fetch, clock: () => TEST_NOW });
+            const subscription = client.subscribe(identity);
+
+            await flush();
+            await flush();
+            await client.checkAvailability();
+            await client.checkAvailability();
+            await client.checkAvailability();
+            expect(fetch).toHaveBeenCalledTimes(4);
+            subscription.cancel();
+        }
+    });
+
     test('revokes a cached ready result when health disables the server and refetches after recovery', async () => {
         const identity = { type: 'movie', id: 'tt1234567', scope: 'meta' };
         const payload = metadataFor(identity);
