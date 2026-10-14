@@ -162,7 +162,7 @@ const MetaItem = React.memo(({ className, type, releaseInfo, released, links, im
                             <div className={classnames(styles['title-label'], { [styles['bilingual-title-label']]: bilingual.enabled, [styles['card-title-label']]: Boolean(cardMetadata) })}>
                                 {bilingual.enabled ?
                                     <BilingualTitle metadata={bilingual.metadata} originalName={name} compact={true} />
-                                    : typeof name === 'string' && name.length > 0 ? name : ''}
+                                    : typeof name === 'string' && name.length > 0 ? <div className={styles['original-title']}>{name}</div> : ''}
                                 {cardMetadata && <div className={styles['card-metadata']} data-card-metadata={true} title={t('CARD_YEAR_IMDB', { defaultValue: 'Year / IMDb rating' })}>{cardMetadata}</div>}
                             </div>
                         </div>
