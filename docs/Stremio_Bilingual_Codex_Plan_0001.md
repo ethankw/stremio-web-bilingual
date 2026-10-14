@@ -927,3 +927,20 @@ Git 工作区：CLEAN / DIRTY
 - 真实播放：现有服务播放 The Kid，视频尺寸 1440×1072、readyState 4、无解码错误，暂停/恢复/跳至 4:58 后继续推进。第二条英文字幕可选择并观察渲染。声音本人选择稍后验收；中文字幕实际渲染仍待验收。
 - 日历为独立 CalendarContentItem，未确认可靠父级身份，保留原文；播放器顶栏/媒体会话保留原题；未经真实插件验证的 TMDB 标识、YouTube、直播保持原显示。正式账号片库/继续观看、Trakt 和移动底部面板仍需相应真实条件验收，不宣称全局全部通过。
 - PWA 名称和 HTML 标题区分个人双语 Fork，About/Credits 保留 GPL、指向本 Fork 对应源码、采用 TMDB 官方未修改标识和指定声明。使用与发布边界见 Personal_Runbook.md。
+
+
+### 阶段 D 补充：订阅 TTL 与私人预览准备
+
+- 只读审查发现 ready 订阅可能超过缓存 TTL 后继续显示旧内容。提交 63b3f2bccfbbf64db2d5e54dcdc17ee549ad6e95 记录来源 expiresAt；同 SHA 健康检查只刷新实际到期且可缓存的结果，新旧同 key 订阅合并一个请求。独立审查关闭该缺陷，142/142 测试、类型检查、lint/build/dry-run 通过；CI 38569681358 success。
+- 干净提交 1d1de2540d64b034fa6e0a24c2085ab4b0999fcd 的关闭版预览实际部署：stremio-bilingual-preview.ethankw.workers.dev，首个 Worker 版本 7ce28d1b-6ac1-47f7-a32e-57091daead82，没有云端凭证。
+- 单 Worker 新建 Stremio 专用 Access 策略 7b502b96-2dc0-4da4-a855-d0a5f7f550b3，绑定应用 a6739d5c-5ad2-44df-9ba0-8ad345a60ed4，All traffic，仅本人已核验身份。未改其他项目策略或账户级开关。匿名首页、静态 main.js、health、meta 均 403；真实 Chrome 通过本人现有 Google 登录进入。
+- 保护验证后通过进程标准输入设置本 Worker TMDB_READ_TOKEN Secret；没有将秘密放入参数、聊天、源码、日志或构建产物。启用候选 6dccb9fb345cced90ba15fa895f79853f3ae7678，CI 38570051737 success；干净 release checkout 构建 86 个文件，检查无实际令牌。
+- 启用版私人功能、稳定实例、PWA 与回滚实际验收继续进行；不将准备完成视作最终交付。用户实际听音选择稍后验收，保留待确认。
+
+
+### 私人预览实际验收收据
+
+- 启用版提交 6dccb9fb345cced90ba15fa895f79853f3ae7678 的 Worker 版本 ba440db6-2eee-4e3c-9e63-6e416780156c。真实 Chrome 从旧版本应用内更新入口加载新 SHA；私人 HTTPS 显示真实 The Kid / 寻子遇仙记及独立两段简介，原 1080p 片源参数一致。
+- 真实回滚演练：关闭且已有 Secret 的版本 c602ae5a-82a5-4a92-8617-2991b1006618，其 RELEASE_SHA 为 1d1de2540d64b034fa6e0a24c2085ab4b0999fcd，开关 false，Secret 仅存在绑定名。回滚到此版本后，无需刷新，已显示译文自动撤销，保留原 Cinemeta 简介和原片源；随后恢复 ba440db6-2eee-4e3c-9e63-6e416780156c。两次 CLI 操作均成功，Access 匿名请求仍受保护。
+- 私人 HTTPS 本机服务起初 Loading；本人自行允许 Chrome 本机网络访问后，重新加载播放页恢复。访客 The Kid 实际播放超过 34 秒，1440×1072、readyState 4、error null，暂停成功。现有本机服务 4.21.2 Online；未更改服务配置或重启服务。声音本人仍选择稍后验收。
+- PR #1 已创建 draft，仅本 Fork personal-main；正式账号与 PWA 安装、稳定发布仍待完成。
