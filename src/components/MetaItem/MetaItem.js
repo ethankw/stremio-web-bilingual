@@ -19,8 +19,11 @@ const styles = require('./styles');
 const { useBilingualMetadata, getBilingualTitleText } = require('stremio/common/bilingual');
 const { BilingualTitle } = require('stremio/components/BilingualMetadata');
 
-const MetaItem = React.memo(({ className, type, name, poster, posterShape, posterChangeCursor, progress, newVideos, options, actionMenu, deepLinks, href: customHref, dataset, optionOnSelect, onDismissClick, onPlayClick, watched, live, bilingualIdentity, ...props }) => {
+const getCardMetadata = require('./getCardMetadata');
+
+const MetaItem = React.memo(({ className, type, releaseInfo, released, links, imdbRating, name, poster, posterShape, posterChangeCursor, progress, newVideos, options, actionMenu, deepLinks, href: customHref, dataset, optionOnSelect, onDismissClick, onPlayClick, watched, live, bilingualIdentity, ...props }) => {
     const { t } = useTranslation();
+    const cardMetadata = getCardMetadata({ type, releaseInfo, released, links, imdbRating });
     const bilingual = useBilingualMetadata(bilingualIdentity, { lazy: true, priority: 1 });
     const displayTitle = bilingual.enabled ? getBilingualTitleText(bilingual.metadata, name, bilingual.settings.titleOrder) : name;
     const artwork = poster && typeof poster === 'object' ? poster : { src: poster, shape: posterShape, changeCursor: posterChangeCursor };
@@ -155,11 +158,12 @@ const MetaItem = React.memo(({ className, type, name, poster, posterShape, poste
                 </div>
                 {
                     bilingual.enabled || (typeof name === 'string' && name.length > 0) || hasOptions ?
-                        <div className={classnames(styles['title-bar-container'], { [styles['has-menu']]: hasOptions })}>
-                            <div className={classnames(styles['title-label'], { [styles['bilingual-title-label']]: bilingual.enabled })}>
+                        <div className={classnames(styles['title-bar-container'], { [styles['has-menu']]: hasOptions, [styles['has-metadata']]: type === 'movie' || type === 'series' })}>
+                            <div className={classnames(styles['title-label'], { [styles['bilingual-title-label']]: bilingual.enabled, [styles['card-title-label']]: Boolean(cardMetadata) })}>
                                 {bilingual.enabled ?
                                     <BilingualTitle metadata={bilingual.metadata} originalName={name} compact={true} />
                                     : typeof name === 'string' && name.length > 0 ? name : ''}
+                                {cardMetadata && <div className={styles['card-metadata']} data-card-metadata={true} title={t('CARD_YEAR_IMDB', { defaultValue: 'Year / IMDb rating' })}>{cardMetadata}</div>}
                             </div>
                         </div>
                         :
@@ -201,6 +205,10 @@ MetaItem.displayName = 'MetaItem';
 
 MetaItem.propTypes = {
     bilingualIdentity: PropTypes.object,
+    releaseInfo: PropTypes.string,
+    released: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+    links: PropTypes.array,
+    imdbRating: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     className: PropTypes.string,
     type: PropTypes.string,
     name: PropTypes.string,
