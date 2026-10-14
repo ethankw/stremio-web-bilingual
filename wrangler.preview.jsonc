@@ -1,0 +1,20 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "stremio-bilingual-preview",
+    "account_id": "c7172cb0425bd8e96799aa3d2764e3a7",
+    "main": "worker/index.ts",
+    "compatibility_date": "2026-10-14",
+    "workers_dev": true,
+    "preview_urls": false,
+    "assets": {
+        "directory": "./build",
+        "binding": "ASSETS",
+        "run_worker_first": ["/api", "/api/*"]
+    },
+    "vars": {
+        "BILINGUAL_METADATA_ENABLED": "false"
+    },
+    "observability": {
+        "enabled": false
+    }
+}

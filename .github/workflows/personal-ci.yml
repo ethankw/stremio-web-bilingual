@@ -1,0 +1,33 @@
+name: Personal Fork Checks
+
+on:
+  push:
+    branches: [personal-main, codex/bilingual-metadata-v1]
+  pull_request:
+    branches: [personal-main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 11.8.0
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck:worker
+      - run: pnpm test --runInBand
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm exec wrangler deploy --config wrangler.preview.jsonc --dry-run
+        env:
+          WRANGLER_SEND_METRICS: 'false'

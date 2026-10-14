@@ -897,3 +897,13 @@ Git 工作区：CLEAN / DIRTY
 - 此阶段只证明合成数据的显示与退回行为，不证明真实 TMDB、正式账号、播放、PWA 安装或任何云端发布。
 - 用户通过 Terminal 完成本项目 TMDB 凭证输入；仅核对 `.dev.vars` 存在、0600 权限和 Git 忽略，未显示值、未上传。
 - 浏览器设置观察到现有 Stremio 服务版本 4.21.2、状态 Online。实际播放和字幕验收仍未执行。
+
+### 阶段 C：真实 Worker 接口验证
+
+- 固定 Wrangler 4.151.0、Worker 类型 5.20261014.1；仅本项目允许 esbuild/workerd 安装脚本。运行时下载超时通过扩大本次安装超时解决，未改全局配置。
+- 使用严格类型检查、固定 TMDB HTTPS 域名、精确 IMDb/type 匹配、翻译地区证据、公开资料的受限内存 LRU 缓存；不使用 Access 不支持的 Cache API，不存账号或请求头。
+- workerd 实际运行不支持 `redirect: error`，尽管当前文档仍列出。改用 `manual` 并拒绝所有 3xx，绝不跟随或转发凭证。通过真实运行定位后移除临时诊断。
+- 本地 `http://localhost:18433/` 使用 .dev.vars，开发脚本单独覆盖功能开关；两个公开发布配置仍为 false。未上传凭证，未创建云资源。
+- 真实 TMDB 验证电影 The Kid、Inception、Parasite、Spirited Away，剧集 Ted Lasso、Game of Thrones，Ted Lasso S1E1/S0E1；不存在单集和 IMDb 返回 unmatched。Ted Lasso 当前精确 zh-CN 标题为空，保留原题并显示缺失，不猜译名。
+- 前端与 Worker 合计 121 项测试通过，Worker 类型检查通过，部署 dry-run 通过。构建产物 86 个文件未包含实际 TMDB 令牌。真实浏览器证明电影中英文标题、独立折叠简介及首页可视卡片显示；账号、播放、字幕、PWA 和私人云端验收仍待完成。
+- 新增个人 Fork 只读 CI，限制继承的官方发布/Pages/清理工作流只在官方仓库执行，避免本 Fork 自动进入上游发布流程。

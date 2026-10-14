@@ -6,11 +6,18 @@
     "private": true,
     "packageManager": "pnpm@11.8.0",
     "license": "gpl-2.0",
+    "jest": {
+        "testPathIgnorePatterns": ["/node_modules/", "/.worker-tests/"]
+    },
     "scripts": {
         "start": "webpack serve --mode development",
         "start-prod": "webpack serve --mode production",
         "build": "webpack --mode production",
-        "test": "jest",
+        "test": "pnpm build:worker-tests && jest",
+        "typecheck:worker": "tsc -p worker/tsconfig.json",
+        "build:worker-tests": "tsc -p worker/tsconfig.tests.json",
+        "dev:personal": "wrangler dev --config wrangler.preview.jsonc --local --port 18433 --ip 127.0.0.1 --var BILINGUAL_METADATA_ENABLED:true",
+        "verify:personal": "pnpm typecheck:worker && pnpm test --runInBand && pnpm lint && pnpm build && wrangler deploy --config wrangler.preview.jsonc --dry-run",
         "lint": "eslint src --max-warnings 287",
         "scan-translations": "pnpx jest ./tests/i18nScan.test.js"
     },
@@ -58,6 +65,7 @@
         "@babel/core": "7.29.0",
         "@babel/preset-env": "7.29.3",
         "@babel/preset-react": "7.28.5",
+        "@cloudflare/workers-types": "5.20261014.1",
         "@eslint/js": "^9.39.4",
         "@stylistic/eslint-plugin": "^5.10.0",
         "@stylistic/eslint-plugin-jsx": "^4.4.1",
@@ -92,6 +100,7 @@
         "webpack": "5.106.2",
         "webpack-cli": "7.0.2",
         "webpack-dev-server": "^5.2.3",
-        "workbox-webpack-plugin": "^7.4.1"
+        "workbox-webpack-plugin": "^7.4.1",
+        "wrangler": "4.151.0"
     }
 }
