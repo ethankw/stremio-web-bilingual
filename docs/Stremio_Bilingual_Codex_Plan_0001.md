@@ -907,3 +907,10 @@ Git 工作区：CLEAN / DIRTY
 - 真实 TMDB 验证电影 The Kid、Inception、Parasite、Spirited Away，剧集 Ted Lasso、Game of Thrones，Ted Lasso S1E1/S0E1；不存在单集和 IMDb 返回 unmatched。Ted Lasso 当前精确 zh-CN 标题为空，保留原题并显示缺失，不猜译名。
 - 前端与 Worker 合计 121 项测试通过，Worker 类型检查通过，部署 dry-run 通过。构建产物 86 个文件未包含实际 TMDB 令牌。真实浏览器证明电影中英文标题、独立折叠简介及首页可视卡片显示；账号、播放、字幕、PWA 和私人云端验收仍待完成。
 - 新增个人 Fork 只读 CI，限制继承的官方发布/Pages/清理工作流只在官方仓库执行，避免本 Fork 自动进入上游发布流程。
+
+### 阶段 C 审查修复：翻译身份一致性
+
+- 上线前只读审查发现：翻译响应顶层 ID 未验证，可能把错配的翻译当成 matched。修复后电影/剧集翻译 ID 必须等于匹配的 TMDB ID；单集详情必须包含正整数 ID，翻译必须等于该单集 ID。
+- 翻译 HTTP 404 与畸形或错配响应分开处理：前者保留已经核实的身份并缺失退回，后者返回 502 且不缓存。
+- Worker 回归测试 45 项通过，新增三种类型的缺失/错误翻译 ID、缺失单集 ID 与 HTTP 404 缺翻译断言；修复后真实 TMDB 10 样本重新通过。
+- 其余前端缓存撤销、年龄/容量和 Access 会话提示审查修复仍进行中；尚未启用云端。

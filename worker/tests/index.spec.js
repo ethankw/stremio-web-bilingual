@@ -63,6 +63,7 @@ const movieDetails = (id = 603, originalLanguage = 'en', originalTitle = 'The Ma
 });
 
 const movieTranslations = (overrides = {}) => jsonResponse({
+    id: overrides.id ?? 603,
     translations: [
         {
             iso_639_1: 'en',
@@ -94,6 +95,7 @@ const episodeDetails = (season = 0, episode = 1) => jsonResponse({
 });
 
 const episodeTranslations = () => jsonResponse({
+    id: 9001,
     translations: [
         {
             iso_639_1: 'en',
@@ -288,7 +290,7 @@ describe('bilingual metadata matching and protocol', () => {
         const upstream = sequenceFetch([
             jsonResponse({ movie_results: [{ id: 101 }], tv_results: [{ id: 202 }] }),
             movieDetails(101),
-            movieTranslations(),
+            movieTranslations({ id: 101 }),
         ]);
         const worker = workerWith(upstream.fetch);
 
@@ -303,6 +305,7 @@ describe('bilingual metadata matching and protocol', () => {
             movieFind(),
             movieDetails(603, 'ja', 'マトリックス'),
             jsonResponse({
+                id: 603,
                 translations: [{
                     iso_639_1: 'zh',
                     iso_3166_1: 'CN',
@@ -376,7 +379,7 @@ describe('bilingual metadata matching and protocol', () => {
         const upstream = sequenceFetch([
             movieFind(),
             movieDetails(),
-            jsonResponse({ translations: [{
+            jsonResponse({ id: 603, translations: [{
                 iso_639_1: 'en',
                 iso_3166_1: 'US',
                 data: { title: '', overview: '' },
@@ -401,7 +404,7 @@ describe('bilingual metadata matching and protocol', () => {
         const upstream = sequenceFetch([
             movieFind(),
             movieDetails(),
-            jsonResponse({ translations: [] }),
+            jsonResponse({ id: 603, translations: [] }),
         ]);
         const worker = workerWith(upstream.fetch);
 
@@ -416,6 +419,42 @@ describe('bilingual metadata matching and protocol', () => {
 });
 
 describe('episode matching, validation, and cache keys', () => {
+    test.each(['movie', 'series', 'episode'])('rejects missing or mismatched translation IDs for %s without caching', async (kind) => {
+        for (const id of [undefined, 99999]) {
+            const episodeScope = kind === 'episode';
+            const series = kind !== 'movie';
+            const responses = () => [
+                series ? tvFind() : movieFind(),
+                episodeScope ? episodeDetails() : series ? jsonResponse({ id: 1399, original_language: 'en', original_name: 'Series' }) : movieDetails(),
+                jsonResponse({ id, translations: [] }),
+            ];
+            const upstream = sequenceFetch([...responses(), ...responses()]);
+            const worker = workerWith(upstream.fetch);
+            const path = episodeScope ? '/api/bilingual/v1/episode?type=series&id=tt0944947&zh=zh-CN&season=0&episode=1' : `/api/bilingual/v1/meta?type=${kind}&id=tt0133093&zh=zh-CN`;
+            expect((await worker.fetch(requestFor(path), makeEnv())).status).toBe(502);
+            expect((await worker.fetch(requestFor(path), makeEnv())).status).toBe(502);
+            expect(upstream.fetch).toHaveBeenCalledTimes(6);
+        }
+    });
+
+    test('requires a positive episode detail ID before requesting translations', async () => {
+        const upstream = sequenceFetch([tvFind(), jsonResponse({ season_number: 0, episode_number: 1 })]);
+        const worker = workerWith(upstream.fetch);
+        expect((await worker.fetch(requestFor('/api/bilingual/v1/episode?type=series&id=tt0944947&zh=zh-CN&season=0&episode=1'), makeEnv())).status).toBe(502);
+        expect(upstream.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    test('keeps a verified identity when translations are absent with HTTP 404', async () => {
+        const upstream = sequenceFetch([movieFind(), movieDetails(), jsonResponse({}, 404)]);
+        const worker = workerWith(upstream.fetch);
+        const metadata = await bodyOf(await worker.fetch(requestFor('/api/bilingual/v1/meta?type=movie&id=tt0133093&zh=zh-CN'), makeEnv()));
+        expect(metadata.matchStatus).toBe('matched');
+        expect(metadata.identity.tmdbId).toBe(603);
+        expect(metadata.title.en.evidence).toBe('original-language');
+        expect(metadata.title.zh.status).toBe('missing');
+        expect(metadata.overview.en.status).toBe('missing');
+    });
+
     test('matches season zero as an episode and never uses the series overview', async () => {
         const upstream = sequenceFetch([
             tvFind(1399),

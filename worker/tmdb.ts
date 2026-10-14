@@ -14,7 +14,7 @@ export const MAX_TMDB_RESPONSE_BYTES = 1024 * 1024;
 
 const RETRY_DELAY_MS = 50;
 const MAX_RETRY_AFTER_SECONDS = 60;
-const MAX_TEXT_LENGTH = 100_000;
+const MAX_TEXT_LENGTH = 50_000;
 
 type TmdbFailureKind = 'timeout' | 'rate-limit' | 'not-found' | 'bad-response' | 'network';
 
@@ -402,7 +402,7 @@ const validateEpisodeDetails = (payload: unknown, season: number, episode: numbe
         return null;
     }
 
-    if (payload.id !== undefined && !isPositiveInteger(payload.id)) {
+    if (!isPositiveInteger(payload.id)) {
         throw new TmdbFailure('bad-response');
     }
 
@@ -414,6 +414,7 @@ const validateEpisodeDetails = (payload: unknown, season: number, episode: numbe
 };
 
 const translationData = (payload: unknown, language: string, country: string): TmdbRecord | null => {
+    if (payload === null) return null;
     if (!isRecord(payload) || !Array.isArray(payload.translations)) {
         throw new TmdbFailure('bad-response');
     }
@@ -446,12 +447,16 @@ const buildFields = (identity: MetadataIdentity, details: TmdbRecord, translatio
     };
 };
 
-const translationsOrEmpty = async (url: string, options: TmdbOptions, deadline: number): Promise<unknown> => {
+const translationsOrEmpty = async (url: string, expectedId: number, options: TmdbOptions, deadline: number): Promise<unknown> => {
     try {
-        return await requestJson(url, options, deadline);
+        const payload = await requestJson(url, options, deadline);
+        if (!isRecord(payload) || payload.id !== expectedId || !Array.isArray(payload.translations)) {
+            throw new TmdbFailure('bad-response');
+        }
+        return payload;
     } catch (error) {
         if (error instanceof TmdbFailure && error.kind === 'not-found') {
-            return { translations: [] };
+            return null;
         }
 
         throw error;
@@ -481,7 +486,7 @@ const resolveMovieOrSeries = async (
         return createMetadata(identity, 'unmatched', null, nowAsIso(options.now));
     }
 
-    const translations = await translationsOrEmpty(translationsUrl, options, deadline);
+    const translations = await translationsOrEmpty(translationsUrl, tmdbId, options, deadline);
     return createMetadata(identity, 'matched', tmdbId, nowAsIso(options.now), buildFields(identity, details, translations));
 };
 
@@ -508,7 +513,7 @@ const resolveEpisode = async (
         return createMetadata(identity, 'unmatched', null, nowAsIso(options.now));
     }
 
-    const translations = await translationsOrEmpty(episodeTranslationsUrl(tmdbId, season, episode), options, deadline);
+    const translations = await translationsOrEmpty(episodeTranslationsUrl(tmdbId, season, episode), details.id as number, options, deadline);
     return createMetadata(identity, 'matched', tmdbId, nowAsIso(options.now), buildFields(identity, details, translations));
 };
 
