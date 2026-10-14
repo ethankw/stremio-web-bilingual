@@ -132,6 +132,7 @@ const LibItem = ({ _id, removable, notifications, watched, detailsVideosFirst, .
     return (
         <MetaItem
             {...props}
+            bilingualIdentity={{ type: props.type, id: _id, scope: 'meta' }}
             href={detailsHref}
             watched={watched}
             newVideos={newVideos}
@@ -144,6 +145,7 @@ const LibItem = ({ _id, removable, notifications, watched, detailsVideosFirst, .
 
 LibItem.propTypes = {
     _id: PropTypes.string,
+    type: PropTypes.string,
     removable: PropTypes.bool,
     progress: PropTypes.number,
     notifications: PropTypes.object,

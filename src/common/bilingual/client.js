@@ -8,8 +8,13 @@ const MATCH_ALGORITHM_VERSION = 'imdb-exact-v1';
 const SUCCESS_TTL = 24 * 60 * 60 * 1000;
 const UNMATCHED_TTL = 30 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 512;
+const MAX_CACHE_BYTES = 512 * 1024;
+const MAX_TEXT_LENGTH = 50_000;
+const CLOCK_SKEW_LIMIT = 60 * 1000;
 const MAX_CONCURRENT_REQUESTS = 4;
 const REQUEST_TIMEOUT = 10 * 1000;
+const HEALTH_POLL_INTERVAL = 30 * 1000;
+const HEALTH_URL = '/api/health';
 const SUPPORTED_TYPES = new Set(['movie', 'series']);
 const SUPPORTED_SCOPES = new Set(['meta', 'episode']);
 const SUPPORTED_MATCH_STATUSES = new Set(['matched', 'unmatched', 'ambiguous', 'unsupported']);
@@ -65,7 +70,7 @@ const normalizeIdentity = (identity) => {
         };
     }
 
-    if (type !== 'series' || !Number.isInteger(identity.season) || identity.season < 0 || !Number.isInteger(identity.episode) || identity.episode < 1) {
+    if (type !== 'series' || !Number.isSafeInteger(identity.season) || identity.season < 0 || !Number.isSafeInteger(identity.episode) || identity.episode < 1) {
         return { valid: false, reason: 'episode' };
     }
 
@@ -116,7 +121,7 @@ const isUsableLocalizedText = (value, expectedLocale, options = {}) => {
         return false;
     }
 
-    if (typeof value.text !== 'string' || value.text.trim().length === 0 || value.source !== 'tmdb' || !SUPPORTED_EVIDENCE.has(value.evidence)) {
+    if (typeof value.text !== 'string' || value.text.length > MAX_TEXT_LENGTH || value.text.trim().length === 0 || value.source !== 'tmdb' || !SUPPORTED_EVIDENCE.has(value.evidence)) {
         return false;
     }
 
@@ -136,11 +141,23 @@ const validateLocalizedText = (value, expectedLocale, options = {}) => {
         return isUsableLocalizedText(value, expectedLocale, options);
     }
 
-    return value.status === 'missing' && value.text === null && (value.effectiveLocale === null || typeof value.effectiveLocale === 'string') && (value.source === null || value.source === 'tmdb') && value.evidence === null;
+    return value.status === 'missing' && value.text === null && value.effectiveLocale === null && value.source === null && value.evidence === null;
 };
 
 const validateMetadata = (metadata, identity) => {
-    if (!isRecord(metadata) || metadata.schemaVersion !== 1 || !isRecord(metadata.identity) || metadata.identity.stremioType !== identity.type || metadata.identity.stremioId !== identity.id || (metadata.identity.scope !== undefined && metadata.identity.scope !== identity.scope) || !(metadata.identity.tmdbId === null || (typeof metadata.identity.tmdbId === 'number' && Number.isInteger(metadata.identity.tmdbId) && metadata.identity.tmdbId > 0)) || !SUPPORTED_MATCH_STATUSES.has(metadata.matchStatus) || !isRecord(metadata.title) || !isRecord(metadata.overview) || !validateLocalizedText(metadata.title.en, ENGLISH_LOCALE, { allowEnglishOriginal: true }) || !validateLocalizedText(metadata.title.zh, DEFAULT_LOCALE) || !validateLocalizedText(metadata.overview.en, ENGLISH_LOCALE) || !validateLocalizedText(metadata.overview.zh, DEFAULT_LOCALE) || typeof metadata.fetchedAt !== 'string' || !Number.isFinite(Date.parse(metadata.fetchedAt)) || metadata.scope !== identity.scope) {
+    if (!isRecord(metadata) || metadata.schemaVersion !== 1 || !isRecord(metadata.identity) || metadata.identity.stremioType !== identity.type || metadata.identity.stremioId !== identity.id || (metadata.identity.scope !== undefined && metadata.identity.scope !== identity.scope) || !SUPPORTED_MATCH_STATUSES.has(metadata.matchStatus) || !isRecord(metadata.title) || !isRecord(metadata.overview) || !validateLocalizedText(metadata.title.en, ENGLISH_LOCALE, { allowEnglishOriginal: true }) || !validateLocalizedText(metadata.title.zh, DEFAULT_LOCALE) || !validateLocalizedText(metadata.overview.en, ENGLISH_LOCALE) || !validateLocalizedText(metadata.overview.zh, DEFAULT_LOCALE) || typeof metadata.fetchedAt !== 'string' || !Number.isFinite(Date.parse(metadata.fetchedAt)) || metadata.scope !== identity.scope) {
+        return false;
+    }
+
+    const tmdbId = metadata.identity.tmdbId;
+    const hasValidTmdbId = typeof tmdbId === 'number' && Number.isSafeInteger(tmdbId) && tmdbId > 0;
+    const fieldsAreMissing = [metadata.title.en, metadata.title.zh, metadata.overview.en, metadata.overview.zh].every((value) => value.status === 'missing' && value.text === null && value.effectiveLocale === null && value.source === null && value.evidence === null);
+
+    if (metadata.matchStatus === 'matched' && !hasValidTmdbId) {
+        return false;
+    }
+
+    if (metadata.matchStatus !== 'matched' && (tmdbId !== null || !fieldsAreMissing)) {
         return false;
     }
 
@@ -186,13 +203,70 @@ const readHeader = (response, name) => {
 
 const isAccessUrl = (url) => typeof url === 'string' && /(?:^|[/?#])(access|login|authorize)(?:[/?#]|$)/i.test(url);
 
+const isAccessResponse = (response, contentType = readHeader(response, 'content-type')) => {
+    return response.redirected === true || response.type === 'opaque' || response.type === 'opaqueredirect' || response.status === 401 || response.status === 403 || (typeof contentType === 'string' && contentType.toLowerCase().includes('text/html')) || isAccessUrl(response.url);
+};
+
+const getUtf8ByteLength = (value) => {
+    if (typeof TextEncoder === 'function') {
+        return new TextEncoder().encode(value).byteLength;
+    }
+
+    return value.length;
+};
+
+const getFetchedAt = (metadata) => {
+    const fetchedAt = Date.parse(metadata.fetchedAt);
+    return Number.isFinite(fetchedAt) ? fetchedAt : null;
+};
+
+const parseHealthResponse = async (response) => {
+    if (!isRecord(response)) {
+        throw createError('health-invalid');
+    }
+
+    const contentType = readHeader(response, 'content-type');
+    if (isAccessResponse(response, contentType)) {
+        throw createError('access-expired');
+    }
+
+    const isOk = response.status >= 200 && response.status < 300 && response.ok !== false;
+    if (!isOk) {
+        throw createError('health-http');
+    }
+
+    if (typeof contentType !== 'string' || !/^application\/json(?:\s*;|\s*$)/i.test(contentType)) {
+        throw createError('health-invalid');
+    }
+
+    const body = await readResponseBody(response);
+    if (!isRecord(body)) {
+        throw createError('health-invalid');
+    }
+
+    const allowedKeys = new Set(['schemaVersion', 'configured', 'enabled', 'RELEASE_SHA']);
+    if (Object.keys(body).some((key) => !allowedKeys.has(key)) || body.schemaVersion !== 1 || typeof body.configured !== 'boolean' || typeof body.enabled !== 'boolean') {
+        throw createError('health-invalid');
+    }
+
+    if (hasOwn(body, 'RELEASE_SHA') && (typeof body.RELEASE_SHA !== 'string' || body.RELEASE_SHA.length === 0 || body.RELEASE_SHA.length > 256)) {
+        throw createError('health-invalid');
+    }
+
+    return {
+        configured: body.configured,
+        enabled: body.enabled,
+        releaseSha: hasOwn(body, 'RELEASE_SHA') ? body.RELEASE_SHA : null,
+    };
+};
+
 const parseResponse = async (response, identity) => {
     if (!isRecord(response)) {
         throw createError('invalid-response');
     }
 
     const contentType = readHeader(response, 'content-type');
-    if (response.redirected === true || response.type === 'opaqueredirect' || response.status === 401 || response.status === 403 || (typeof contentType === 'string' && contentType.toLowerCase().includes('text/html')) || isAccessUrl(response.url)) {
+    if (isAccessResponse(response, contentType)) {
         throw createError('access-expired');
     }
 
@@ -200,9 +274,13 @@ const parseResponse = async (response, identity) => {
         throw createError(`http-${response.status}`);
     }
 
-    const isOk = response.ok === undefined ? response.status >= 200 && response.status < 300 : response.ok;
+    const isOk = response.status >= 200 && response.status < 300 && response.ok !== false;
     if (!isOk) {
         throw createError(`http-${response.status}`);
+    }
+
+    if (typeof contentType !== 'string' || !/^application\/json(?:\s*;|\s*$)/i.test(contentType)) {
+        throw createError('invalid-response');
     }
 
     const body = await readResponseBody(response);
@@ -232,8 +310,9 @@ const getLabel = (labels, key, defaults) => typeof labels?.[key] === 'string' ? 
 
 const getBilingualTitleLines = (metadata, originalName, order = 'en-first', labels = DEFAULT_TITLE_LABELS) => {
     const safeOriginalName = typeof originalName === 'string' && originalName.length > 0 ? originalName : getLabel(labels, 'originalMissing', DEFAULT_TITLE_LABELS);
-    const enText = isUsableLocalizedText(metadata?.title?.en, ENGLISH_LOCALE, { allowEnglishOriginal: true }) ? metadata.title.en.text : null;
-    const zhText = isUsableLocalizedText(metadata?.title?.zh, DEFAULT_LOCALE) ? metadata.title.zh.text : null;
+    const matched = isRecord(metadata) && metadata.matchStatus === 'matched' && isRecord(metadata.identity) && typeof metadata.identity.tmdbId === 'number' && Number.isSafeInteger(metadata.identity.tmdbId) && metadata.identity.tmdbId > 0;
+    const enText = matched && isUsableLocalizedText(metadata.title?.en, ENGLISH_LOCALE, { allowEnglishOriginal: true }) ? metadata.title.en.text : null;
+    const zhText = matched && isUsableLocalizedText(metadata.title?.zh, DEFAULT_LOCALE) ? metadata.title.zh.text : null;
 
     if (enText === null && zhText === null) {
         return [{ language: 'original', text: safeOriginalName }];
@@ -244,11 +323,15 @@ const getBilingualTitleLines = (metadata, originalName, order = 'en-first', labe
     }
 
     const locales = order === 'zh-first' ? ['zh', 'en'] : ['en', 'zh'];
-    return locales.map((locale) => ({
+    const lines = locales.map((locale) => ({
         language: locale,
         text: locale === 'en' ? enText || getLabel(labels, 'englishMissing', DEFAULT_TITLE_LABELS) : zhText || getLabel(labels, 'chineseMissing', DEFAULT_TITLE_LABELS),
         missing: locale === 'en' ? enText === null : zhText === null,
     }));
+    if ((enText === null || zhText === null) && safeOriginalName !== enText && safeOriginalName !== zhText) {
+        lines.push({ language: 'original', text: safeOriginalName });
+    }
+    return lines;
 };
 
 const getBilingualTitleText = (metadata, originalName, order = 'en-first', labels = DEFAULT_TITLE_LABELS) => {
@@ -257,15 +340,16 @@ const getBilingualTitleText = (metadata, originalName, order = 'en-first', label
 
 const getBilingualOverviewEntries = (metadata, originalDescription, order = 'zh-first', labels = DEFAULT_OVERVIEW_LABELS) => {
     const safeOriginalDescription = typeof originalDescription === 'string' ? originalDescription : '';
-    const enText = isUsableLocalizedText(metadata?.overview?.en, ENGLISH_LOCALE) ? metadata.overview.en.text : null;
-    const zhText = isUsableLocalizedText(metadata?.overview?.zh, DEFAULT_LOCALE) ? metadata.overview.zh.text : null;
+    const matched = isRecord(metadata) && metadata.matchStatus === 'matched' && isRecord(metadata.identity) && typeof metadata.identity.tmdbId === 'number' && Number.isSafeInteger(metadata.identity.tmdbId) && metadata.identity.tmdbId > 0;
+    const enText = matched && isUsableLocalizedText(metadata?.overview?.en, ENGLISH_LOCALE) ? metadata.overview.en.text : null;
+    const zhText = matched && isUsableLocalizedText(metadata?.overview?.zh, DEFAULT_LOCALE) ? metadata.overview.zh.text : null;
 
     if (enText === null && zhText === null) {
         return [{ language: 'original', label: getLabel(labels, 'original', DEFAULT_OVERVIEW_LABELS), text: safeOriginalDescription || getLabel(labels, 'empty', DEFAULT_OVERVIEW_LABELS), available: safeOriginalDescription.length > 0 }];
     }
 
     const locales = order === 'en-first' ? ['en', 'zh'] : ['zh', 'en'];
-    return locales.map((locale) => {
+    const entries = locales.map((locale) => {
         const text = locale === 'en' ? enText : zhText;
         return {
             language: locale,
@@ -274,6 +358,10 @@ const getBilingualOverviewEntries = (metadata, originalDescription, order = 'zh-
             available: text !== null,
         };
     });
+    if ((enText === null || zhText === null) && safeOriginalDescription && safeOriginalDescription !== enText && safeOriginalDescription !== zhText) {
+        entries.push({ language: 'original', label: getLabel(labels, 'original', DEFAULT_OVERVIEW_LABELS), text: safeOriginalDescription, available: true });
+    }
+    return entries;
 };
 
 const createBilingualClient = (dependencies = {}) => {
@@ -287,8 +375,14 @@ const createBilingualClient = (dependencies = {}) => {
     };
     const setTimer = typeof dependencies.setTimeout === 'function' ? dependencies.setTimeout : setTimeout;
     const clearTimer = typeof dependencies.clearTimeout === 'function' ? dependencies.clearTimeout : clearTimeout;
+    const setIntervalImpl = typeof dependencies.setInterval === 'function' ? dependencies.setInterval : setInterval;
+    const clearIntervalImpl = typeof dependencies.clearInterval === 'function' ? dependencies.clearInterval : clearInterval;
     const AbortControllerImpl = dependencies.AbortController || globalThis.AbortController;
     const timeout = Number.isFinite(dependencies.timeoutMs) ? dependencies.timeoutMs : REQUEST_TIMEOUT;
+    const healthTimeout = Number.isFinite(dependencies.healthTimeoutMs) ? dependencies.healthTimeoutMs : REQUEST_TIMEOUT;
+    const browserWindow = dependencies.window || (typeof window === 'object' && window !== null ? window : null);
+    const browserDocument = dependencies.document || (typeof document === 'object' && document !== null ? document : null);
+    const monitorAvailability = dependencies.monitorAvailability === true;
     const cache = new Map();
     const tasks = new Map();
     const subscriptions = new Set();
@@ -296,10 +390,27 @@ const createBilingualClient = (dependencies = {}) => {
     let activeCount = 0;
     let sequence = 0;
     let stopped = false;
+    let serverAvailability = monitorAvailability ? 'checking' : 'available';
+    let serverAvailabilityReason = null;
+    let observedGeneration = null;
+    let hasHealthSnapshot = false;
+    let availabilityTask = null;
+    let availabilityMonitorStarted = false;
+    let availabilityInterval = null;
+    let cacheBytes = 0;
 
     const safeNow = () => {
         const value = getClockValue(clock);
         return Number.isFinite(value) ? value : Date.now();
+    };
+
+    const removeCacheEntry = (key, entry = cache.get(key)) => {
+        if (!entry) {
+            return;
+        }
+
+        cache.delete(key);
+        cacheBytes -= entry.bytes;
     };
 
     const readCache = (key) => {
@@ -309,7 +420,7 @@ const createBilingualClient = (dependencies = {}) => {
         }
 
         if (entry.expiresAt <= safeNow()) {
-            cache.delete(key);
+            removeCacheEntry(key, entry);
             return null;
         }
 
@@ -319,19 +430,49 @@ const createBilingualClient = (dependencies = {}) => {
     };
 
     const writeCache = (key, metadata) => {
-        if (metadata.matchStatus === 'unsupported') {
+        if (metadata.matchStatus !== 'matched' && metadata.matchStatus !== 'unmatched') {
+            return;
+        }
+
+        const fetchedAt = getFetchedAt(metadata);
+        const now = safeNow();
+        if (fetchedAt === null || fetchedAt > now + CLOCK_SKEW_LIMIT) {
             return;
         }
 
         const ttl = metadata.matchStatus === 'unmatched' ? UNMATCHED_TTL : SUCCESS_TTL;
-        cache.delete(key);
-        cache.set(key, {
-            metadata,
-            expiresAt: safeNow() + ttl,
-        });
+        const expiresAt = fetchedAt + ttl;
+        if (expiresAt <= now) {
+            return;
+        }
 
-        while (cache.size > MAX_CACHE_ENTRIES) {
-            cache.delete(cache.keys().next().value);
+        let serialized;
+        try {
+            serialized = JSON.stringify(metadata);
+        } catch {
+            return;
+        }
+
+        const bytes = getUtf8ByteLength(serialized);
+        if (bytes > MAX_CACHE_BYTES) {
+            return;
+        }
+
+        removeCacheEntry(key);
+        cache.set(key, {
+            metadata: JSON.parse(serialized),
+            bytes,
+            expiresAt,
+        });
+        cacheBytes += bytes;
+
+        while (cache.size > MAX_CACHE_ENTRIES || cacheBytes > MAX_CACHE_BYTES) {
+            const oldestKey = cache.keys().next().value;
+            if (oldestKey === undefined) {
+                break;
+            }
+
+            removeCacheEntry(oldestKey);
         }
     };
 
@@ -355,7 +496,9 @@ const createBilingualClient = (dependencies = {}) => {
     };
 
     const detachTask = (task) => {
-        tasks.delete(task.key);
+        if (tasks.get(task.key) === task) {
+            tasks.delete(task.key);
+        }
         task.listeners.forEach((subscription) => {
             if (subscription.task === task) {
                 subscription.task = null;
@@ -366,6 +509,60 @@ const createBilingualClient = (dependencies = {}) => {
 
     const sortQueue = () => {
         queue.sort((first, second) => first.priority - second.priority || first.sequence - second.sequence);
+    };
+
+    const availabilityResult = (reason = serverAvailabilityReason) => ({
+        metadata: null,
+        status: serverAvailability === 'access-expired' ? 'access-expired' : 'unavailable',
+        error: reason || 'availability-unavailable',
+    });
+
+    const serverIsAvailable = () => serverAvailability === 'available';
+
+    const invalidateTask = (task, result) => {
+        task.invalidated = true;
+        task.invalidatedResult = result;
+        task.refreshAfterFinish = false;
+        removeFromQueue(task);
+        if (tasks.get(task.key) === task) {
+            tasks.delete(task.key);
+        }
+        task.listeners.forEach((subscription) => {
+            if (subscription.task === task) {
+                subscription.task = null;
+            }
+        });
+        task.listeners.clear();
+        if (task.controller) {
+            task.controller.abort();
+        }
+        task.resolve(result);
+    };
+
+    const invalidateSubscriptions = (result) => {
+        Array.from(tasks.values()).forEach((task) => invalidateTask(task, result));
+        queue.splice(0);
+        Array.from(subscriptions).forEach((subscription) => {
+            if (subscription.active) {
+                subscription.task = null;
+                notify(subscription, result);
+            }
+        });
+    };
+
+    const clearStoredCache = () => {
+        cache.clear();
+        cacheBytes = 0;
+    };
+
+    const blockAvailability = (nextAvailability, reason) => {
+        const changed = serverAvailability !== nextAvailability || serverAvailabilityReason !== reason;
+        serverAvailability = nextAvailability;
+        serverAvailabilityReason = reason;
+        if (changed) {
+            clearStoredCache();
+            invalidateSubscriptions(availabilityResult(reason));
+        }
     };
 
     const enqueue = (task) => {
@@ -389,7 +586,8 @@ const createBilingualClient = (dependencies = {}) => {
         const fetchOptions = {
             method: 'GET',
             headers: { Accept: 'application/json' },
-            redirect: 'error',
+            credentials: 'same-origin',
+            redirect: 'manual',
         };
 
         if (controller) {
@@ -425,13 +623,60 @@ const createBilingualClient = (dependencies = {}) => {
         }
     };
 
+    const executeHealthFetch = async () => {
+        const controller = typeof AbortControllerImpl === 'function' ? new AbortControllerImpl() : null;
+        let timeoutId = null;
+        let timedOut = false;
+        const fetchOptions = {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+            cache: 'no-store',
+            redirect: 'manual',
+        };
+
+        if (controller) {
+            fetchOptions.signal = controller.signal;
+        }
+
+        const fetchPromise = Promise.resolve()
+            .then(() => fetchImpl(HEALTH_URL, fetchOptions))
+            .then(parseHealthResponse);
+        const timeoutPromise = new Promise((resolve, reject) => {
+            timeoutId = setTimer(() => {
+                timedOut = true;
+                if (controller) {
+                    controller.abort();
+                }
+                reject(createError('health-timeout'));
+            }, healthTimeout);
+        });
+
+        try {
+            return await Promise.race([fetchPromise, timeoutPromise]);
+        } catch (error) {
+            if (timedOut) {
+                throw createError('health-timeout');
+            }
+
+            throw error;
+        } finally {
+            if (timeoutId !== null) {
+                clearTimer(timeoutId);
+            }
+        }
+    };
+
     const toResult = (metadata) => ({ metadata, status: 'ready' });
 
-    const errorResult = (error) => ({
-        metadata: null,
-        status: error && (error.code === 'access-expired' || (typeof error.message === 'string' && /(?:redirect|opaqueredirect|access|login|html)/i.test(error.message))) ? 'access-expired' : 'error',
-        error: error && typeof error.code === 'string' ? error.code : 'request-failed',
-    });
+    const errorResult = (error) => {
+        const code = error && typeof error.code === 'string' && /^(?:access-expired|cancelled|disabled|fetch-unavailable|invalid-response|request-failed|timeout|http-\d{3})$/.test(error.code) ? error.code : 'request-failed';
+        return {
+            metadata: null,
+            status: code === 'access-expired' ? 'access-expired' : 'error',
+            error: code,
+        };
+    };
 
     const runTask = async (task) => {
         let result;
@@ -440,19 +685,42 @@ const createBilingualClient = (dependencies = {}) => {
             const metadata = await executeFetch(task.identity, (controller) => {
                 task.controller = controller;
             });
+            if (task.invalidated) {
+                task.controller = null;
+                return;
+            }
+
             if (stopped) {
                 result = errorResult(createError('disabled'));
+            } else if (!serverIsAvailable()) {
+                result = availabilityResult();
             } else {
                 writeCache(task.key, metadata);
                 result = toResult(metadata);
             }
         } catch (error) {
+            if (task.invalidated) {
+                task.controller = null;
+                return;
+            }
+
+            if (error && error.code === 'access-expired') {
+                blockAvailability('access-expired', 'access-expired');
+                task.controller = null;
+                return;
+            }
+
             result = errorResult(error);
         }
 
         task.controller = null;
 
-        if (task.refreshAfterFinish && !stopped && task.listeners.size > 0) {
+        if (task.invalidated) {
+            task.controller = null;
+            return;
+        }
+
+        if (task.refreshAfterFinish && !stopped && serverIsAvailable() && task.listeners.size > 0) {
             task.refreshAfterFinish = false;
             enqueue(task);
             return;
@@ -477,7 +745,7 @@ const createBilingualClient = (dependencies = {}) => {
                 pump();
             }, (error) => {
                 activeCount -= 1;
-                const result = errorResult(error);
+                const result = task.invalidated ? task.invalidatedResult : errorResult(error);
                 task.resolve(result);
                 Array.from(task.listeners).forEach((subscription) => notify(subscription, result));
                 detachTask(task);
@@ -497,6 +765,8 @@ const createBilingualClient = (dependencies = {}) => {
             listeners: new Set(),
             controller: null,
             refreshAfterFinish: false,
+            invalidated: false,
+            invalidatedResult: null,
             promise: new Promise((promiseResolve) => {
                 resolve = promiseResolve;
             }),
@@ -511,8 +781,15 @@ const createBilingualClient = (dependencies = {}) => {
             return;
         }
 
+        subscription.started = true;
+
         if (stopped) {
             notify(subscription, errorResult(createError('disabled')));
+            return;
+        }
+
+        if (!serverIsAvailable()) {
+            notify(subscription, availabilityResult());
             return;
         }
 
@@ -566,6 +843,7 @@ const createBilingualClient = (dependencies = {}) => {
         const priority = Number.isFinite(options.priority) ? options.priority : 1;
         const subscription = {
             active: true,
+            started: false,
             identity: normalized,
             key: normalized.valid ? getRequestKey(normalized) : null,
             priority,
@@ -630,8 +908,130 @@ const createBilingualClient = (dependencies = {}) => {
         });
     };
 
+    const restartStartedSubscriptions = () => {
+        if (stopped || !serverIsAvailable()) {
+            return;
+        }
+
+        Array.from(subscriptions).forEach((subscription) => {
+            if (subscription.active && subscription.started) {
+                startSubscription(subscription, true);
+            }
+        });
+    };
+
+    const applyHealth = (health) => {
+        const generationChanged = hasHealthSnapshot && observedGeneration !== health.releaseSha;
+        observedGeneration = health.releaseSha;
+        hasHealthSnapshot = true;
+
+        if (!health.enabled) {
+            blockAvailability('disabled', 'server-disabled');
+            return { status: 'unavailable', configured: health.configured, enabled: false, releaseSha: health.releaseSha };
+        }
+
+        if (!health.configured) {
+            blockAvailability('not-configured', 'server-not-configured');
+            return { status: 'unavailable', configured: false, enabled: true, releaseSha: health.releaseSha };
+        }
+
+        if (generationChanged) {
+            blockAvailability('checking', 'generation-changed');
+        }
+
+        const wasAvailable = serverIsAvailable();
+        serverAvailability = 'available';
+        serverAvailabilityReason = null;
+        if (!wasAvailable || generationChanged) {
+            restartStartedSubscriptions();
+        }
+
+        return { status: 'available', configured: true, enabled: true, releaseSha: health.releaseSha };
+    };
+
+    const applyHealthError = (error) => {
+        if (error && error.code === 'access-expired') {
+            blockAvailability('access-expired', 'access-expired');
+            return { status: 'access-expired', configured: false, enabled: false };
+        }
+
+        blockAvailability('unavailable', 'health-check-failed');
+        return { status: 'unavailable', configured: false, enabled: false };
+    };
+
+    const checkAvailability = () => {
+        if (availabilityTask !== null) {
+            return availabilityTask;
+        }
+
+        availabilityTask = executeHealthFetch()
+            .then(applyHealth)
+            .catch(applyHealthError)
+            .finally(() => {
+                availabilityTask = null;
+            });
+
+        return availabilityTask;
+    };
+
+    const onFocus = () => {
+        checkAvailability();
+    };
+
+    const onPageShow = () => {
+        checkAvailability();
+    };
+
+    const onVisibilityChange = () => {
+        if (!browserDocument || browserDocument.visibilityState === 'visible') {
+            checkAvailability();
+        }
+    };
+
+    const startAvailabilityMonitoring = () => {
+        if (availabilityMonitorStarted) {
+            return availabilityTask || Promise.resolve({ status: serverAvailability });
+        }
+
+        availabilityMonitorStarted = true;
+        blockAvailability('checking', 'health-check');
+        if (browserWindow && typeof browserWindow.addEventListener === 'function') {
+            browserWindow.addEventListener('focus', onFocus);
+            browserWindow.addEventListener('pageshow', onPageShow);
+        }
+        if (browserDocument && typeof browserDocument.addEventListener === 'function') {
+            browserDocument.addEventListener('visibilitychange', onVisibilityChange);
+        }
+        availabilityInterval = setIntervalImpl(() => {
+            if (!browserDocument || browserDocument.visibilityState !== 'hidden') {
+                checkAvailability();
+            }
+        }, HEALTH_POLL_INTERVAL);
+
+        return checkAvailability();
+    };
+
+    const stopAvailabilityMonitoring = () => {
+        if (!availabilityMonitorStarted) {
+            return;
+        }
+
+        availabilityMonitorStarted = false;
+        if (browserWindow && typeof browserWindow.removeEventListener === 'function') {
+            browserWindow.removeEventListener('focus', onFocus);
+            browserWindow.removeEventListener('pageshow', onPageShow);
+        }
+        if (browserDocument && typeof browserDocument.removeEventListener === 'function') {
+            browserDocument.removeEventListener('visibilitychange', onVisibilityChange);
+        }
+        if (availabilityInterval !== null) {
+            clearIntervalImpl(availabilityInterval);
+            availabilityInterval = null;
+        }
+    };
+
     const clearCache = () => {
-        cache.clear();
+        clearStoredCache();
         Array.from(subscriptions).forEach((subscription) => {
             if (subscription.active) {
                 if (subscription.task && subscription.task.state === 'active') {
@@ -648,34 +1048,28 @@ const createBilingualClient = (dependencies = {}) => {
 
     const stopRequests = () => {
         stopped = true;
-        queue.splice(0).forEach((task) => {
-            const result = errorResult(createError('disabled'));
-            tasks.delete(task.key);
-            task.resolve(result);
-            Array.from(task.listeners).forEach((subscription) => notify(subscription, result));
-            detachTask(task);
-        });
-        tasks.forEach((task) => {
-            if (task.state === 'active') {
-                task.refreshAfterFinish = task.listeners.size > 0;
-                if (task.controller) {
-                    task.controller.abort();
-                }
-            }
-        });
+        invalidateSubscriptions(errorResult(createError('disabled')));
     };
 
     const resumeRequests = () => {
+        const wasStopped = stopped;
         stopped = false;
-        pump();
+        if (wasStopped && serverIsAvailable()) {
+            restartStartedSubscriptions();
+        }
     };
 
     return {
+        checkAvailability,
         clearCache,
+        getAvailability: () => serverAvailability,
+        getCacheBytes: () => cacheBytes,
         getCacheSize: () => cache.size,
         request,
         resumeRequests,
         stopRequests,
+        startAvailabilityMonitoring,
+        stopAvailabilityMonitoring,
         subscribe,
         validateMetadata,
     };
@@ -685,7 +1079,7 @@ let defaultClient = null;
 
 const getBilingualClient = () => {
     if (defaultClient === null) {
-        defaultClient = createBilingualClient();
+        defaultClient = createBilingualClient({ monitorAvailability: true });
     }
 
     return defaultClient;
@@ -693,8 +1087,11 @@ const getBilingualClient = () => {
 
 module.exports = {
     CACHE_SCHEMA_VERSION,
+    CLOCK_SKEW_LIMIT,
     DEFAULT_LOCALE,
     ENGLISH_LOCALE,
+    MAX_CACHE_BYTES,
+    MAX_TEXT_LENGTH,
     createBilingualClient,
     getBilingualClient,
     getBilingualOverviewEntries,

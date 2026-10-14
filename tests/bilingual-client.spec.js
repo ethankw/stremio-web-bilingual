@@ -6,9 +6,12 @@ const React = require('react');
 const ReactDOMServer = require('react-dom/server');
 const {
     createBilingualClient,
+    CLOCK_SKEW_LIMIT,
     getBilingualOverviewEntries,
     getBilingualTitleText,
     getRequestUrl,
+    MAX_CACHE_BYTES,
+    MAX_TEXT_LENGTH,
     normalizeIdentity,
 } = require('../src/common/bilingual/client');
 
@@ -33,6 +36,8 @@ jest.mock('react-i18next', () => ({
 }));
 
 const { BilingualOverview, BilingualTitle } = require('../src/components/BilingualMetadata');
+
+const TEST_NOW = Date.now();
 
 const available = (locale, text) => ({
     text,
@@ -68,7 +73,7 @@ const metadataFor = (identity, overrides = {}) => ({
         en: available('en-US', 'English overview'),
         zh: available('zh-CN', '中文简介'),
     },
-    fetchedAt: '2026-10-14T00:00:00.000Z',
+    fetchedAt: new Date(TEST_NOW).toISOString(),
     scope: identity.scope,
     ...overrides,
 });
@@ -80,6 +85,13 @@ const response = (body, options = {}) => ({
     text: async () => JSON.stringify(body),
     ...options,
 });
+
+const healthResponse = (overrides = {}, options = {}) => response({
+    schemaVersion: 1,
+    configured: true,
+    enabled: true,
+    ...overrides,
+}, options);
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -163,8 +175,13 @@ const createHookHarness = (client) => {
 
 const createHookClient = () => {
     const subscriptions = [];
+    let availability = 'available';
     return {
         subscriptions,
+        getAvailability: () => availability,
+        setAvailability: (nextAvailability) => {
+            availability = nextAvailability;
+        },
         subscribe: (identity, options) => {
             const subscription = {
                 canceled: false,
@@ -247,7 +264,7 @@ describe('bilingual client contract', () => {
         expect(client.validateMetadata(englishOriginal, normalizeIdentity(identity))).toBe(true);
         expect(getBilingualTitleText(englishOriginal, '原始片名')).toBe('English original title / 中文标题');
         expect(client.validateMetadata(japaneseOriginal, normalizeIdentity(identity))).toBe(false);
-        expect(getBilingualTitleText(japaneseOriginal, '原始片名')).toBe('English title unavailable / 中文标题');
+        expect(getBilingualTitleText(japaneseOriginal, '原始片名')).toBe('English title unavailable / 中文标题 / 原始片名');
         expect(getBilingualOverviewEntries(overviewWithoutEvidence, 'Original overview')[0]).toMatchObject({
             language: 'zh',
             available: true,
@@ -256,6 +273,53 @@ describe('bilingual client contract', () => {
             language: 'en',
             available: false,
         });
+        expect(getBilingualOverviewEntries(overviewWithoutEvidence, 'Original overview')[2]).toMatchObject({
+            language: 'original',
+            text: 'Original overview',
+            available: true,
+        });
+    });
+
+    test('requires a matched positive safe TMDB id and strictly empty fields for every non-matched result', () => {
+        const identity = { type: 'movie', id: 'tt1234567', scope: 'meta' };
+        const matchedWithoutId = metadataFor(identity, {
+            identity: { stremioType: identity.type, stremioId: identity.id, tmdbId: null },
+        });
+        const unmatchedWithId = metadataFor(identity, {
+            matchStatus: 'unmatched',
+            identity: { stremioType: identity.type, stremioId: identity.id, tmdbId: 123 },
+        });
+        const unmatchedWithAvailableText = metadataFor(identity, {
+            matchStatus: 'unmatched',
+            identity: { stremioType: identity.type, stremioId: identity.id, tmdbId: null },
+        });
+        const unsafeId = metadataFor(identity, {
+            identity: { stremioType: identity.type, stremioId: identity.id, tmdbId: Number.MAX_SAFE_INTEGER + 1 },
+        });
+
+        unmatchedWithAvailableText.title.en = available('en-US', 'must not display');
+
+        const client = createBilingualClient({ fetch: jest.fn() });
+        expect(client.validateMetadata(matchedWithoutId, normalizeIdentity(identity))).toBe(false);
+        expect(client.validateMetadata(unmatchedWithId, normalizeIdentity(identity))).toBe(false);
+        expect(client.validateMetadata(unmatchedWithAvailableText, normalizeIdentity(identity))).toBe(false);
+        expect(client.validateMetadata(unsafeId, normalizeIdentity(identity))).toBe(false);
+        expect(getBilingualTitleText(unmatchedWithAvailableText, 'Original title')).toBe('Original title');
+        expect(getBilingualOverviewEntries(unmatchedWithAvailableText, 'Original overview')[0].language).toBe('original');
+    });
+
+    test('rejects successful non-JSON responses and does not cache ambiguous matches', async () => {
+        const identity = { type: 'movie', id: 'tt1234567', scope: 'meta' };
+        const ambiguous = metadataFor(identity, { matchStatus: 'ambiguous', identity: { stremioType: 'movie', stremioId: identity.id, tmdbId: null }, title: { en: missing('en-US'), zh: missing('zh-CN') }, overview: { en: missing('en-US'), zh: missing('zh-CN') } });
+        const fetch = jest.fn()
+            .mockResolvedValueOnce(response(metadataFor(identity), { headers: { get: () => 'text/plain' } }))
+            .mockResolvedValueOnce(response(ambiguous))
+            .mockResolvedValueOnce(response(metadataFor(identity)));
+        const client = createBilingualClient({ fetch });
+        expect((await client.request(identity)).status).toBe('error');
+        expect((await client.request(identity)).metadata.matchStatus).toBe('ambiguous');
+        expect((await client.request(identity)).metadata.matchStatus).toBe('matched');
+        expect(fetch).toHaveBeenCalledTimes(3);
     });
 
     test('does not request unsupported identities and merges concurrent requests into one task', async () => {
@@ -297,8 +361,15 @@ describe('bilingual client contract', () => {
                 tmdbId: 123,
             },
         });
-        const fetch = jest.fn()
-            .mockResolvedValueOnce(response('<html>Access login</html>', { headers: { get: () => 'text/html' }, text: async () => '<html>Access login</html>' }))
+        const accessFetch = jest.fn()
+            .mockResolvedValueOnce(response('<html>Access login</html>', { headers: { get: () => 'text/html' }, text: async () => '<html>Access login</html>' }));
+        const accessClient = createBilingualClient({ fetch: accessFetch });
+
+        await expect(accessClient.request(identity)).resolves.toMatchObject({ status: 'access-expired', metadata: null });
+        await expect(accessClient.request(identity)).resolves.toMatchObject({ status: 'access-expired', metadata: null });
+        expect(accessFetch).toHaveBeenCalledTimes(1);
+
+        const malformedFetch = jest.fn()
             .mockResolvedValueOnce(response(malformed))
             .mockResolvedValueOnce(response(metadataFor(identity, {
                 identity: {
@@ -308,12 +379,64 @@ describe('bilingual client contract', () => {
                     tmdbId: 123,
                 },
             })));
+        const malformedClient = createBilingualClient({ fetch: malformedFetch });
+
+        await expect(malformedClient.request(identity)).resolves.toMatchObject({ status: 'error', metadata: null });
+        await expect(malformedClient.request(identity)).resolves.toMatchObject({ status: 'error', metadata: null });
+        expect(malformedFetch).toHaveBeenCalledTimes(2);
+    });
+
+    test('uses manual same-origin metadata requests and maps opaque redirects to access-expired', async () => {
+        const identity = { type: 'movie', id: 'tt1234567', scope: 'meta' };
+        const opaqueRedirect = {
+            ok: false,
+            status: 0,
+            type: 'opaqueredirect',
+            redirected: false,
+            headers: { get: () => null },
+            text: jest.fn(),
+        };
+        const fetch = jest.fn().mockResolvedValue(opaqueRedirect);
         const client = createBilingualClient({ fetch });
 
         await expect(client.request(identity)).resolves.toMatchObject({ status: 'access-expired', metadata: null });
-        await expect(client.request(identity)).resolves.toMatchObject({ status: 'error', metadata: null });
-        await expect(client.request(identity)).resolves.toMatchObject({ status: 'error', metadata: null });
-        expect(fetch).toHaveBeenCalledTimes(3);
+        expect(fetch.mock.calls[0][0]).toBe('/api/bilingual/v1/meta?type=movie&id=tt1234567&zh=zh-CN');
+        expect(fetch.mock.calls[0][1]).toEqual(expect.objectContaining({
+            credentials: 'same-origin',
+            redirect: 'manual',
+        }));
+        expect(opaqueRedirect.text).not.toHaveBeenCalled();
+    });
+
+    test('does not auto-health-check factory clients and validates a strict health response', async () => {
+        const fetch = jest.fn().mockResolvedValue(healthResponse({ RELEASE_SHA: 'release-a' }));
+        const client = createBilingualClient({ fetch });
+
+        await flush();
+        expect(fetch).not.toHaveBeenCalled();
+        await expect(client.checkAvailability()).resolves.toEqual({
+            status: 'available',
+            configured: true,
+            enabled: true,
+            releaseSha: 'release-a',
+        });
+        expect(fetch).toHaveBeenCalledWith('/api/health', expect.objectContaining({
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            redirect: 'manual',
+            headers: { Accept: 'application/json' },
+        }));
+
+        const contradictoryHealth = jest.fn().mockResolvedValue(response({
+            schemaVersion: 1,
+            configured: true,
+            enabled: true,
+            private: 'must be rejected',
+        }));
+        const contradictoryClient = createBilingualClient({ fetch: contradictoryHealth });
+        await expect(contradictoryClient.checkAvailability()).resolves.toMatchObject({ status: 'unavailable' });
+        expect(contradictoryClient.getAvailability()).toBe('unavailable');
     });
 
     test('expires an unmatched response after thirty minutes and does not cache timeout failures', async () => {
@@ -323,6 +446,7 @@ describe('bilingual client contract', () => {
             identity: { stremioType: 'movie', stremioId: identity.id, tmdbId: null },
             title: { en: missing('en-US'), zh: missing('zh-CN') },
             overview: { en: missing('en-US'), zh: missing('zh-CN') },
+            fetchedAt: new Date(0).toISOString(),
         });
         let now = 0;
         const fetch = jest.fn().mockResolvedValue(response(unmatched));
@@ -341,6 +465,68 @@ describe('bilingual client contract', () => {
         await expect(timeoutClient.request(identity)).resolves.toMatchObject({ status: 'error', metadata: null });
         await expect(timeoutClient.request(identity)).resolves.toMatchObject({ status: 'error', metadata: null });
         expect(timeoutFetch).toHaveBeenCalledTimes(2);
+    });
+
+    test('anchors matched TTL to fetchedAt and refuses stale or future-skewed timestamps', async () => {
+        const identity = { type: 'movie', id: 'tt1234567', scope: 'meta' };
+        let now = TEST_NOW;
+        const nearExpiry = metadataFor(identity, {
+            fetchedAt: new Date(now - (24 * 60 * 60 * 1000) + 1000).toISOString(),
+        });
+        const fetch = jest.fn().mockResolvedValue(response(nearExpiry));
+        const client = createBilingualClient({ fetch, clock: () => now });
+
+        await client.request(identity);
+        now += 1001;
+        await client.request(identity);
+        expect(fetch).toHaveBeenCalledTimes(2);
+
+        const oldIdentity = { type: 'movie', id: 'tt1234568', scope: 'meta' };
+        const oldFetch = jest.fn().mockResolvedValue(response(metadataFor(oldIdentity, {
+            fetchedAt: new Date(now - (24 * 60 * 60 * 1000) - 1).toISOString(),
+        })));
+        const oldClient = createBilingualClient({ fetch: oldFetch, clock: () => now });
+        await oldClient.request(oldIdentity);
+        await oldClient.request(oldIdentity);
+        expect(oldFetch).toHaveBeenCalledTimes(2);
+
+        const futureIdentity = { type: 'movie', id: 'tt1234569', scope: 'meta' };
+        const futureFetch = jest.fn().mockResolvedValue(response(metadataFor(futureIdentity, {
+            fetchedAt: new Date(now + CLOCK_SKEW_LIMIT + 1).toISOString(),
+        })));
+        const futureClient = createBilingualClient({ fetch: futureFetch, clock: () => now });
+        await futureClient.request(futureIdentity);
+        await futureClient.request(futureIdentity);
+        expect(futureFetch).toHaveBeenCalledTimes(2);
+    });
+
+    test('keeps the normalized cache within the 512 KiB byte LRU budget', async () => {
+        const largeText = 'x'.repeat(MAX_TEXT_LENGTH);
+        const identities = Array.from({ length: 12 }, (_, index) => ({
+            type: 'movie',
+            id: `tt${String(1234567 + index).padStart(7, '0')}`,
+            scope: 'meta',
+        }));
+        const fetch = jest.fn((url) => {
+            const id = new URL(`https://example.test${url}`).searchParams.get('id');
+            const identity = identities.find((candidate) => candidate.id === id);
+            return Promise.resolve(response(metadataFor(identity, {
+                title: {
+                    en: available('en-US', largeText),
+                    zh: available('zh-CN', '中文标题'),
+                },
+            })));
+        });
+        const client = createBilingualClient({ fetch, clock: () => TEST_NOW });
+
+        for (const identity of identities) {
+            await client.request(identity);
+        }
+
+        expect(client.getCacheBytes()).toBeLessThanOrEqual(MAX_CACHE_BYTES);
+        expect(client.getCacheSize()).toBeLessThan(identities.length);
+        await client.request(identities[0]);
+        expect(fetch).toHaveBeenCalledTimes(identities.length + 1);
     });
 
     test('limits active tasks to four and starts the highest-priority queued task first', async () => {
@@ -380,6 +566,152 @@ describe('bilingual client contract', () => {
         const queuedNormalUrl = getRequestUrl(normalizeIdentity(identities[4]));
         pending.get(queuedNormalUrl)(response(metadataFor(identities[4])));
         await expect(Promise.all([...requests, queuedNormal, queuedUrgent])).resolves.toHaveLength(6);
+    });
+});
+
+describe('bilingual availability gate', () => {
+    test('installs one production monitor with focus, pageshow, visibility, and thirty-second polling triggers', async () => {
+        const windowListeners = new Map();
+        const documentListeners = new Map();
+        const browserWindow = {
+            addEventListener: jest.fn((event, listener) => windowListeners.set(event, listener)),
+            removeEventListener: jest.fn((event) => windowListeners.delete(event)),
+        };
+        const browserDocument = {
+            visibilityState: 'visible',
+            addEventListener: jest.fn((event, listener) => documentListeners.set(event, listener)),
+            removeEventListener: jest.fn((event) => documentListeners.delete(event)),
+        };
+        let intervalCallback;
+        const setInterval = jest.fn((callback, milliseconds) => {
+            intervalCallback = callback;
+            expect(milliseconds).toBe(30 * 1000);
+            return 1;
+        });
+        const clearInterval = jest.fn();
+        const fetch = jest.fn().mockResolvedValue(healthResponse());
+        const client = createBilingualClient({
+            fetch,
+            monitorAvailability: true,
+            window: browserWindow,
+            document: browserDocument,
+            setInterval,
+            clearInterval,
+        });
+
+        await client.startAvailabilityMonitoring();
+        await client.startAvailabilityMonitoring();
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(setInterval).toHaveBeenCalledTimes(1);
+        expect(browserWindow.addEventListener).toHaveBeenCalledTimes(2);
+        expect(browserDocument.addEventListener).toHaveBeenCalledTimes(1);
+
+        windowListeners.get('focus')();
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(2);
+
+        browserDocument.visibilityState = 'hidden';
+        documentListeners.get('visibilitychange')();
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(2);
+
+        browserDocument.visibilityState = 'visible';
+        documentListeners.get('visibilitychange')();
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(3);
+
+        intervalCallback();
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(4);
+        client.stopAvailabilityMonitoring();
+        expect(clearInterval).toHaveBeenCalledWith(1);
+        expect(browserWindow.removeEventListener).toHaveBeenCalledTimes(2);
+        expect(browserDocument.removeEventListener).toHaveBeenCalledTimes(1);
+    });
+
+    test('revokes a cached ready result when health disables the server and refetches after recovery', async () => {
+        const identity = { type: 'movie', id: 'tt1234567', scope: 'meta' };
+        const payload = metadataFor(identity);
+        const fetch = jest.fn()
+            .mockResolvedValueOnce(response(payload))
+            .mockResolvedValueOnce(healthResponse({ enabled: false }))
+            .mockResolvedValueOnce(healthResponse())
+            .mockResolvedValueOnce(response(payload));
+        const client = createBilingualClient({ fetch, clock: () => TEST_NOW });
+        const changes = [];
+        const subscription = client.subscribe(identity, {
+            autoStart: false,
+            onChange: (result) => changes.push(result),
+        });
+
+        subscription.start();
+        await flush();
+        await flush();
+        expect(changes.at(-1)).toMatchObject({ status: 'ready', metadata: payload });
+
+        await client.checkAvailability();
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(changes.at(-1)).toMatchObject({ status: 'unavailable', metadata: null });
+        expect(client.getAvailability()).toBe('disabled');
+
+        await client.checkAvailability();
+        await flush();
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(changes.at(-1)).toMatchObject({ status: 'ready', metadata: payload });
+        subscription.cancel();
+    });
+
+    test('clears ready results and refetches when RELEASE_SHA changes', async () => {
+        const identity = { type: 'series', id: 'tt1234567', scope: 'meta' };
+        const first = metadataFor(identity);
+        const second = metadataFor(identity, { fetchedAt: new Date(TEST_NOW + 1000).toISOString() });
+        const fetch = jest.fn()
+            .mockResolvedValueOnce(response(first))
+            .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'release-a' }))
+            .mockResolvedValueOnce(healthResponse({ RELEASE_SHA: 'release-b' }))
+            .mockResolvedValueOnce(response(second));
+        const client = createBilingualClient({ fetch, clock: () => TEST_NOW });
+        const changes = [];
+        const subscription = client.subscribe(identity, { onChange: (result) => changes.push(result) });
+
+        await flush();
+        await flush();
+        expect(changes.at(-1)).toMatchObject({ status: 'ready', metadata: first });
+        await client.checkAvailability();
+        await client.checkAvailability();
+        await flush();
+        await flush();
+
+        expect(changes.some((result) => result.metadata === null && result.status === 'unavailable')).toBe(true);
+        expect(changes.at(-1)).toMatchObject({ status: 'ready', metadata: second });
+        expect(fetch).toHaveBeenCalledTimes(4);
+        subscription.cancel();
+    });
+
+    test('health failures revoke old data without long caching and recover through the same subscription', async () => {
+        const identity = { type: 'movie', id: 'tt1234567', scope: 'meta' };
+        const payload = metadataFor(identity);
+        const fetch = jest.fn()
+            .mockResolvedValueOnce(response(payload))
+            .mockResolvedValueOnce(response({ error: 'temporary' }, { status: 503 }))
+            .mockResolvedValueOnce(healthResponse())
+            .mockResolvedValueOnce(response(payload));
+        const client = createBilingualClient({ fetch, clock: () => TEST_NOW });
+        const changes = [];
+        const subscription = client.subscribe(identity, { onChange: (result) => changes.push(result) });
+
+        await flush();
+        await flush();
+        await client.checkAvailability();
+        expect(changes.at(-1)).toMatchObject({ status: 'unavailable', metadata: null });
+        expect(client.getCacheSize()).toBe(0);
+        await client.checkAvailability();
+        await flush();
+        await flush();
+        expect(changes.at(-1)).toMatchObject({ status: 'ready', metadata: payload });
+        expect(fetch).toHaveBeenCalledTimes(4);
+        subscription.cancel();
     });
 });
 
@@ -484,5 +816,26 @@ describe('bilingual metadata hook contract', () => {
                 global.IntersectionObserver = previousIntersectionObserver;
             }
         }
+    });
+
+    test('hides a ready result while the client availability gate is closed', () => {
+        const client = createHookClient();
+        const harness = createHookHarness(client);
+        const identity = { type: 'movie', id: 'tt1234567', scope: 'meta' };
+        const metadata = metadataFor(identity);
+
+        harness.render(identity, { lazy: false });
+        harness.runEffects();
+        client.subscriptions[0].onChange({ metadata, status: 'ready' });
+        expect(harness.render(identity, { lazy: false })).toMatchObject({ metadata, status: 'ready' });
+
+        client.setAvailability('disabled');
+        expect(harness.render(identity, { lazy: false })).toMatchObject({ metadata: null, status: 'unavailable' });
+        client.subscriptions[0].onChange({ metadata: null, status: 'unavailable' });
+        expect(harness.render(identity, { lazy: false })).toMatchObject({ metadata: null, status: 'unavailable' });
+
+        client.setAvailability('available');
+        client.subscriptions[0].onChange({ metadata, status: 'ready' });
+        expect(harness.render(identity, { lazy: false })).toMatchObject({ metadata, status: 'ready' });
     });
 });

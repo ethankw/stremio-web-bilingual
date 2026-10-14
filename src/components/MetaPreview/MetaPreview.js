@@ -192,7 +192,7 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                         null
                 }
                 {
-                    compact && typeof description === 'string' && description.length > 0 ?
+                    !bilingual.enabled && compact && typeof description === 'string' && description.length > 0 ?
                         <div className={styles['description-container']}>
                             {description}
                         </div>

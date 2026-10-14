@@ -86,12 +86,20 @@ const installStorageListener = () => {
             return;
         }
 
+        const previousEnabled = settings.enabled;
         const nextSettings = parseSettings(event.newValue);
         settings = Object.freeze(nextSettings || { ...DEFAULT_SETTINGS });
-        if (!settings.enabled) {
-            getBilingualClient().stopRequests();
-        } else {
-            getBilingualClient().resumeRequests();
+        const client = getBilingualClient();
+        if (previousEnabled && !settings.enabled) {
+            client.stopRequests();
+            if (typeof client.stopAvailabilityMonitoring === 'function') {
+                client.stopAvailabilityMonitoring();
+            }
+        } else if (!previousEnabled && settings.enabled) {
+            if (typeof client.startAvailabilityMonitoring === 'function') {
+                client.startAvailabilityMonitoring();
+            }
+            client.resumeRequests();
         }
         notify();
     });
@@ -141,12 +149,20 @@ const updateSettings = (patch) => {
         return settings;
     }
 
+    const previousEnabled = settings.enabled;
     settings = Object.freeze(nextSettings);
     writeSettings();
-    if (!settings.enabled) {
-        getBilingualClient().stopRequests();
-    } else {
-        getBilingualClient().resumeRequests();
+    const client = getBilingualClient();
+    if (previousEnabled && !settings.enabled) {
+        client.stopRequests();
+        if (typeof client.stopAvailabilityMonitoring === 'function') {
+            client.stopAvailabilityMonitoring();
+        }
+    } else if (!previousEnabled && settings.enabled) {
+        if (typeof client.startAvailabilityMonitoring === 'function') {
+            client.startAvailabilityMonitoring();
+        }
+        client.resumeRequests();
     }
     notify();
     return settings;

@@ -242,6 +242,7 @@ const Discover = () => {
                 {discover.catalog.content.content.map((metaItem, index) => (
                     <MetaItem
                         key={index}
+                        bilingualIdentity={{ type: metaItem.type, id: metaItem.id, scope: 'meta' }}
                         className={classnames({ 'selected': selectedMetaItemIndex === index })}
                         type={metaItem.type}
                         name={metaItem.name}
@@ -260,6 +261,7 @@ const Discover = () => {
 
     const metaPreviewProps = selectedMetaItem && {
         compact: true,
+        bilingualIdentity: { type: selectedMetaItem.type, id: selectedMetaItem.id, scope: 'meta' },
         name: selectedMetaItem.name,
         logo: selectedMetaItem.logo,
         runtime: selectedMetaItem.runtime,

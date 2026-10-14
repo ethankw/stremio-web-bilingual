@@ -373,9 +373,10 @@ const candidateId = (payload: unknown, type: SupportedType): number[] => {
 
     const ids = new Set<number>();
     for (const result of results) {
-        if (isRecord(result) && isPositiveInteger(result.id)) {
-            ids.add(result.id);
+        if (!isRecord(result) || !isPositiveInteger(result.id)) {
+            throw new TmdbFailure('bad-response');
         }
+        ids.add(result.id);
     }
 
     return Array.from(ids);

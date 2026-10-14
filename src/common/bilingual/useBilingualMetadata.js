@@ -7,6 +7,7 @@ const { useBilingualSettings } = require('./settings');
 
 const useBilingualMetadata = (identity, options = {}) => {
     const { settings } = useBilingualSettings();
+    const client = getBilingualClient();
     const identityInput = React.useMemo(() => ({
         type: identity?.type,
         stremioType: identity?.stremioType,
@@ -21,6 +22,7 @@ const useBilingualMetadata = (identity, options = {}) => {
     const lazy = options.lazy === true;
     const priority = Number.isFinite(options.priority) ? options.priority : 1;
     const enabled = settings.enabled && normalizedIdentity.valid;
+    const availability = typeof client.getAvailability === 'function' ? client.getAvailability() : 'available';
     const [resultState, setResultState] = React.useState({ key: identityKey, metadata: null, status: 'idle' });
     const subscriptionRef = React.useRef(null);
     const subscriptionKeyRef = React.useRef(null);
@@ -35,7 +37,11 @@ const useBilingualMetadata = (identity, options = {}) => {
             return undefined;
         }
 
-        const subscription = getBilingualClient().subscribe(normalizedIdentity, {
+        if (typeof client.startAvailabilityMonitoring === 'function') {
+            client.startAvailabilityMonitoring();
+        }
+
+        const subscription = client.subscribe(normalizedIdentity, {
             priority,
             autoStart: false,
             onChange: (nextResult) => setResultState({ key: identityKey, ...nextResult }),
@@ -59,7 +65,7 @@ const useBilingualMetadata = (identity, options = {}) => {
                 visibleKeyRef.current = null;
             }
         };
-    }, [enabled, identityKey, lazy, priority, normalizedIdentity]);
+    }, [client, enabled, identityKey, lazy, priority, normalizedIdentity]);
 
     const ref = React.useCallback((node) => {
         if (observerRef.current !== null) {
@@ -103,7 +109,10 @@ const useBilingualMetadata = (identity, options = {}) => {
         }
     }, [identityKey]);
 
-    const currentResult = enabled && resultState.key === identityKey ? resultState : { metadata: null, status: 'idle' };
+    const currentResult = enabled && availability === 'available' && resultState.key === identityKey ? resultState : {
+        metadata: null,
+        status: enabled && availability === 'access-expired' ? 'access-expired' : enabled && availability !== 'available' ? 'unavailable' : 'idle',
+    };
 
     return {
         metadata: currentResult.metadata,

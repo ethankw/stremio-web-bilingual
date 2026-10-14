@@ -343,9 +343,9 @@ describe('bilingual metadata matching and protocol', () => {
         expect(upstream.fetch).toHaveBeenCalledTimes(1);
     });
 
-    test('returns unmatched for zero valid candidates and caches only that result', async () => {
+    test('returns unmatched for an empty candidate list and caches only that result', async () => {
         const upstream = sequenceFetch([
-            jsonResponse({ movie_results: [{ id: '603' }], tv_results: [] }),
+            jsonResponse({ movie_results: [], tv_results: [] }),
         ]);
         const worker = workerWith(upstream.fetch);
         const env = makeEnv();
@@ -356,6 +356,20 @@ describe('bilingual metadata matching and protocol', () => {
         expect((await bodyOf(first)).matchStatus).toBe('unmatched');
         expect((await bodyOf(second)).matchStatus).toBe('unmatched');
         expect(upstream.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+        [[{ id: '603' }]],
+        [[{ id: 603 }, { id: null }]],
+        [[null]],
+    ])('rejects malformed candidate rows without treating them as a cacheable no-match: %j', async (entries) => {
+        const makeResponse = () => jsonResponse({ movie_results: entries, tv_results: [] });
+        const upstream = sequenceFetch([makeResponse(), makeResponse()]);
+        const worker = workerWith(upstream.fetch);
+        const path = '/api/bilingual/v1/meta?type=movie&id=tt0133093&zh=zh-CN';
+        expect((await worker.fetch(requestFor(path), makeEnv())).status).toBe(502);
+        expect((await worker.fetch(requestFor(path), makeEnv())).status).toBe(502);
+        expect(upstream.fetch).toHaveBeenCalledTimes(2);
     });
 
     test('expires unmatched entries after thirty minutes', async () => {

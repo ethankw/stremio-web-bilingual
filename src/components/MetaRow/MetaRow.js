@@ -10,6 +10,7 @@ const CONSTANTS = require('stremio/common/CONSTANTS');
 const useTranslate = require('stremio/common/useTranslate');
 const MetaRowPlaceholder = require('./MetaRowPlaceholder');
 const styles = require('./styles');
+const MetaItem = require('stremio/components/MetaItem');
 
 const MetaRow = ({ className, title, catalog, message, itemComponent, notifications }) => {
     const t = useTranslate();
@@ -55,6 +56,7 @@ const MetaRow = ({ className, title, catalog, message, itemComponent, notificati
                                 items.slice(0, CONSTANTS.CATALOG_PREVIEW_SIZE).map((item, index) => {
                                     return React.createElement(itemComponent, {
                                         ...item,
+                                        ...(itemComponent === MetaItem ? { bilingualIdentity: { type: item.type, id: item.id, scope: 'meta' } } : {}),
                                         key: index,
                                         className: classnames(styles['meta-item'], styles['poster-shape-poster'], styles[`poster-shape-${item.posterShape}`]),
                                         notifications,

@@ -265,6 +265,7 @@ const MetaDetails = () => {
                             <VideosList
                                 className={styles['videos-list']}
                                 metaItem={metaDetails.metaItem}
+                                bilingualIdentity={{ type: metaPath.type, id: metaPath.id }}
                                 libraryItem={metaDetails.libraryItem}
                                 season={season}
                                 selectedVideoId={metaDetails.libraryItem?.state?.video_id}

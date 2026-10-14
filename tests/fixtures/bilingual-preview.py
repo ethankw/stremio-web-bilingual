@@ -25,6 +25,7 @@ def text_field(text, locale):
 
 class FixtureHandler(SimpleHTTPRequestHandler):
     unavailable = False
+    translation_mode = 'full'
 
     def send_json(self, status, data):
         body = json.dumps(data, ensure_ascii=False).encode('utf-8')
@@ -38,6 +39,14 @@ class FixtureHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path == '/api/health':
+            if parsed.query:
+                return self.send_json(400, {'error': {'code': 'INVALID_FIXTURE_QUERY'}})
+            return self.send_json(200, {
+                'schemaVersion': 1, 'configured': True,
+                'enabled': not type(self).unavailable,
+                'RELEASE_SHA': 'synthetic-fixture-v1-' + type(self).translation_mode,
+            })
         if parsed.path not in ('/api/bilingual/v1/meta', '/api/bilingual/v1/episode'):
             if parsed.path.startswith('/api/'):
                 return self.send_json(404, {'error': {'code': 'NOT_FOUND'}})
@@ -77,6 +86,12 @@ class FixtureHandler(SimpleHTTPRequestHandler):
             for group in ('title', 'overview'):
                 for language in ('en', 'zh'):
                     result[group][language].update(text=None, effectiveLocale=None, source=None, status='missing', evidence=None)
+        missing_languages = {
+            'missing-en': ('en',), 'missing-zh': ('zh',), 'missing-both': ('en', 'zh'),
+        }.get(type(self).translation_mode, ())
+        for group in ('title', 'overview'):
+            for language in missing_languages:
+                result[group][language].update(text=None, effectiveLocale=None, source=None, status='missing', evidence=None)
         if episode_scope:
             try:
                 result['season'] = int(query.get('season', ['0'])[0])
@@ -92,9 +107,11 @@ class FixtureHandler(SimpleHTTPRequestHandler):
             type(self).unavailable = True
         elif self.path == '/__test/recover':
             type(self).unavailable = False
+        elif self.path in ('/__test/full', '/__test/missing-en', '/__test/missing-zh', '/__test/missing-both'):
+            type(self).translation_mode = self.path.rsplit('/', 1)[-1]
         else:
             return self.send_json(404, {'error': {'code': 'NOT_FOUND'}})
-        self.send_json(200, {'fixtureUnavailable': type(self).unavailable})
+        self.send_json(200, {'fixtureUnavailable': type(self).unavailable, 'translationMode': type(self).translation_mode})
 
 
 if __name__ == '__main__':

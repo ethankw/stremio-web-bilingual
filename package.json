@@ -16,8 +16,8 @@
         "test": "pnpm build:worker-tests && jest",
         "typecheck:worker": "tsc -p worker/tsconfig.json",
         "build:worker-tests": "tsc -p worker/tsconfig.tests.json",
-        "dev:personal": "wrangler dev --config wrangler.preview.jsonc --local --port 18433 --ip 127.0.0.1 --var BILINGUAL_METADATA_ENABLED:true",
-        "verify:personal": "pnpm typecheck:worker && pnpm test --runInBand && pnpm lint && pnpm build && wrangler deploy --config wrangler.preview.jsonc --dry-run",
+        "dev:personal": "WRANGLER_SEND_METRICS=false wrangler dev --config wrangler.preview.jsonc --local --port 18433 --ip 127.0.0.1 --var BILINGUAL_METADATA_ENABLED:true",
+        "verify:personal": "pnpm typecheck:worker && pnpm test --runInBand && pnpm lint && pnpm build && WRANGLER_SEND_METRICS=false wrangler deploy --config wrangler.preview.jsonc --dry-run",
         "lint": "eslint src --max-warnings 287",
         "scan-translations": "pnpx jest ./tests/i18nScan.test.js"
     },

@@ -16,9 +16,13 @@ const useBinaryState = require('stremio/common/useBinaryState');
 const { default: getMetaDetailsHref } = require('stremio/common/getMetaDetailsHref');
 const { ICON_FOR_TYPE } = require('stremio/common/CONSTANTS');
 const styles = require('./styles');
+const { useBilingualMetadata, getBilingualTitleText } = require('stremio/common/bilingual');
+const { BilingualTitle } = require('stremio/components/BilingualMetadata');
 
-const MetaItem = React.memo(({ className, type, name, poster, posterShape, posterChangeCursor, progress, newVideos, options, actionMenu, deepLinks, href: customHref, dataset, optionOnSelect, onDismissClick, onPlayClick, watched, live, ...props }) => {
+const MetaItem = React.memo(({ className, type, name, poster, posterShape, posterChangeCursor, progress, newVideos, options, actionMenu, deepLinks, href: customHref, dataset, optionOnSelect, onDismissClick, onPlayClick, watched, live, bilingualIdentity, ...props }) => {
     const { t } = useTranslation();
+    const bilingual = useBilingualMetadata(bilingualIdentity, { lazy: true, priority: 1 });
+    const displayTitle = bilingual.enabled ? getBilingualTitleText(bilingual.metadata, name, bilingual.settings.titleOrder) : name;
     const artwork = poster && typeof poster === 'object' ? poster : { src: poster, shape: posterShape, changeCursor: posterChangeCursor };
     const { navigateWithOrigin } = useNavigateWithOrigin();
     const [menuOpen, onMenuOpen, onMenuClose] = useBinaryState(false);
@@ -77,8 +81,8 @@ const MetaItem = React.memo(({ className, type, name, poster, posterShape, poste
     ), []);
     const hasOptions = Array.isArray(options) && options.length > 0;
     return (
-        <div {...hoverProps} className={classnames(className, styles['meta-item-container'], styles['poster-shape-poster'], styles[`poster-shape-${artwork.shape}`], { 'active': menuOpen, 'hovered': isHovered })}>
-            <Button title={name} href={href} {...filterInvalidDOMProps(props)} className={styles['meta-item-link']} onClick={metaItemOnClick}>
+        <div {...hoverProps} ref={bilingual.ref} className={classnames(className, styles['meta-item-container'], styles['poster-shape-poster'], styles[`poster-shape-${artwork.shape}`], { 'active': menuOpen, 'hovered': isHovered })}>
+            <Button href={href} {...filterInvalidDOMProps(props)} title={displayTitle} aria-label={displayTitle} className={styles['meta-item-link']} onClick={metaItemOnClick}>
                 <div className={classnames(styles['poster-container'], { 'poster-change-cursor': artwork.changeCursor })}>
                     {
                         onDismissClick ?
@@ -150,10 +154,12 @@ const MetaItem = React.memo(({ className, type, name, poster, posterShape, poste
                     }
                 </div>
                 {
-                    (typeof name === 'string' && name.length > 0) || hasOptions ?
+                    bilingual.enabled || (typeof name === 'string' && name.length > 0) || hasOptions ?
                         <div className={classnames(styles['title-bar-container'], { [styles['has-menu']]: hasOptions })}>
-                            <div className={styles['title-label']}>
-                                {typeof name === 'string' && name.length > 0 ? name : ''}
+                            <div className={classnames(styles['title-label'], { [styles['bilingual-title-label']]: bilingual.enabled })}>
+                                {bilingual.enabled ?
+                                    <BilingualTitle metadata={bilingual.metadata} originalName={name} compact={true} />
+                                    : typeof name === 'string' && name.length > 0 ? name : ''}
                             </div>
                         </div>
                         :
@@ -165,7 +171,7 @@ const MetaItem = React.memo(({ className, type, name, poster, posterShape, poste
                     actionMenu ?
                         <ActionMenu
                             className={styles['menu-label-container']}
-                            title={name}
+                            title={displayTitle}
                             options={options}
                             onOpen={onMenuOpen}
                             onClose={onMenuClose}
@@ -194,6 +200,7 @@ const MetaItem = React.memo(({ className, type, name, poster, posterShape, poste
 MetaItem.displayName = 'MetaItem';
 
 MetaItem.propTypes = {
+    bilingualIdentity: PropTypes.object,
     className: PropTypes.string,
     type: PropTypes.string,
     name: PropTypes.string,

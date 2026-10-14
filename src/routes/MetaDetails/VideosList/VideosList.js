@@ -11,7 +11,7 @@ const SeasonsBar = require('./SeasonsBar');
 const { default: EpisodePicker } = require('../EpisodePicker');
 const styles = require('./styles');
 
-const VideosList = ({ className, metaItem, libraryItem, season, seasonOnSelect, selectedVideoId, toggleNotifications, scrollMemoryRef, titleKey }) => {
+const VideosList = ({ className, metaItem, libraryItem, season, seasonOnSelect, selectedVideoId, toggleNotifications, scrollMemoryRef, titleKey, bilingualIdentity }) => {
     const core = useCore();
     const profile = useProfile();
     const showNotificationsToggle = React.useMemo(() => {
@@ -204,6 +204,7 @@ const VideosList = ({ className, metaItem, libraryItem, season, seasonOnSelect, 
                                                 key={index}
                                                 id={video.id}
                                                 title={video.title}
+                                                bilingualIdentity={bilingualIdentity?.type === 'series' ? { ...bilingualIdentity, scope: 'episode', season: video.season, episode: video.episode } : undefined}
                                                 thumbnail={video.thumbnail}
                                                 season={video.season}
                                                 episode={video.episode}
@@ -229,6 +230,7 @@ const VideosList = ({ className, metaItem, libraryItem, season, seasonOnSelect, 
 };
 
 VideosList.propTypes = {
+    bilingualIdentity: PropTypes.object,
     className: PropTypes.string,
     metaItem: PropTypes.object,
     libraryItem: PropTypes.object,
