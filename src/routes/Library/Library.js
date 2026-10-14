@@ -53,6 +53,12 @@ const Library = ({ model }) => {
     const notifications = useNotifications();
     const [library, loadNextPage] = useLibrary(model, urlParams, queryParams);
     const [typeSelect, sortChips, hasNextPage] = useSelectableInputs(library);
+    const watchedSort = model === 'library' ? library.selected?.request?.sort : null;
+    const emptyLabel = watchedSort === 'watched' ?
+        t('LIBRARY_EMPTY_WATCHED', { defaultValue: 'No watched items in this category.' }) :
+        watchedSort === 'notwatched' ?
+            t('LIBRARY_EMPTY_UNWATCHED', { defaultValue: 'No unwatched items in this category.' }) :
+            t(model === 'library' ? 'LIBRARY_EMPTY' : 'BOARD_CONTINUE_WATCHING_EMPTY');
     const scrollContainerRef = React.useRef(null);
     const onScrollToBottom = React.useCallback(() => {
         if (hasNextPage) {
@@ -99,7 +105,7 @@ const Library = ({ model }) => {
                                             src={require('/assets/images/empty.png')}
                                             alt={' '}
                                         />
-                                        <div className={styles['message-label']}>{model === 'library' ? t('LIBRARY_EMPTY') : t('BOARD_CONTINUE_WATCHING_EMPTY')}</div>
+                                        <div className={styles['message-label']}>{emptyLabel}</div>
                                     </div>
                                     :
                                     <div ref={scrollContainerRef} className={classnames(styles['meta-items-container'], 'animation-fade-in')} onScroll={onScroll}>

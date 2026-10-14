@@ -21,5 +21,7 @@
     "BILINGUAL_OVERVIEW_ORDER": "简介显示顺序",
     "BILINGUAL_CACHE": "双语资料缓存",
     "BILINGUAL_CLEAR_CACHE": "清除双语资料缓存",
-    "BILINGUAL_ABOUT": "关于与致谢"
+    "BILINGUAL_ABOUT": "关于与致谢",
+    "LIBRARY_EMPTY_WATCHED": "此分类暂无已观看内容",
+    "LIBRARY_EMPTY_UNWATCHED": "此分类暂无未观看内容"
 }

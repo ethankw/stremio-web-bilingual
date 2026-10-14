@@ -4,6 +4,8 @@ const React = require('react');
 const { useCore } = require('stremio/core');
 const { useModelState } = require('stremio/common');
 
+const filterWatchedLibrary = require('./filterWatchedLibrary');
+
 const useLibrary = (model, urlParams, queryParams) => {
     const core = useCore();
     const loadNextPage = React.useCallback(() => {
@@ -27,7 +29,8 @@ const useLibrary = (model, urlParams, queryParams) => {
         }
     }), [urlParams, queryParams]);
     const library = useModelState({ model, action });
-    return [library, loadNextPage];
+    const visibleLibrary = React.useMemo(() => filterWatchedLibrary(library, model), [library, model]);
+    return [visibleLibrary, loadNextPage];
 };
 
 module.exports = useLibrary;
