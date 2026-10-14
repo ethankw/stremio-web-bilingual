@@ -20,5 +20,6 @@
     "BILINGUAL_ZH_FIRST": "中文在前，英文在后",
     "BILINGUAL_OVERVIEW_ORDER": "简介显示顺序",
     "BILINGUAL_CACHE": "双语资料缓存",
-    "BILINGUAL_CLEAR_CACHE": "清除双语资料缓存"
+    "BILINGUAL_CLEAR_CACHE": "清除双语资料缓存",
+    "BILINGUAL_ABOUT": "关于与致谢"
 }
