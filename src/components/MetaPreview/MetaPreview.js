@@ -21,6 +21,8 @@ const MetaLinks = require('./MetaLinks');
 const MetaPreviewPlaceholder = require('./MetaPreviewPlaceholder');
 const styles = require('./styles');
 const { Ratings } = require('./Ratings');
+const { useBilingualMetadata } = require('stremio/common/bilingual');
+const { BilingualTitle, BilingualOverview } = require('stremio/components/BilingualMetadata');
 
 const ALLOWED_LINK_REDIRECTS = [
     routesRegexp.search.regexp,
@@ -28,8 +30,12 @@ const ALLOWED_LINK_REDIRECTS = [
     routesRegexp.metadetails.regexp
 ];
 
-const MetaPreview = React.forwardRef(({ className, compact, name, logo, background, runtime, releaseInfo, released, description, deepLinks, links, trailerStreams, inLibrary, toggleInLibrary, watched, toggleWatched, ratingInfo, metadata, children, actions, showIcon = 'play', onShowClick }, ref) => {
+// Personal bilingual display only: original metadata and actions stay unchanged.
+const MetaPreview = React.forwardRef(({ className, compact, name, logo, background, runtime, releaseInfo, released, description, deepLinks, links, trailerStreams, inLibrary, toggleInLibrary, watched, toggleWatched, ratingInfo, metadata, children, actions, showIcon = 'play', onShowClick, bilingualIdentity, bilingualEpisode, bilingualEpisodeName, bilingualEpisodeOverview }, ref) => {
     const { t } = useTranslation();
+    const bilingual = useBilingualMetadata(bilingualIdentity, { priority: 0 });
+    const episodeBilingual = useBilingualMetadata(bilingualEpisode, { priority: 0 });
+    const displayBilingual = bilingualEpisode ? episodeBilingual : bilingual;
     const [shareModalOpen, openShareModal, closeShareModal] = useBinaryState(false);
     const isMobileLandscape = useMediaQuery(`(max-width: ${screenSizes.xsmall}) and (max-height: ${screenSizes['phone-landscape-size']}) and (orientation: landscape)`);
     const iconActions = compact && isMobileLandscape;
@@ -101,8 +107,8 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
         return trailerStreams[0].deepLinks.player;
     }, [trailerStreams]);
     const renderLogoFallback = React.useCallback(() => (
-        <div className={styles['logo-placeholder']}>{name}</div>
-    ), [name]);
+        bilingual.enabled ? null : <div className={styles['logo-placeholder']}>{name}</div>
+    ), [name, bilingual.enabled]);
     const metaItemActions = React.useMemo(() => [
         {
             icon: inLibrary ? 'remove-from-library' : 'add-to-library',
@@ -137,6 +143,16 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                         />
                         :
                         renderLogoFallback()
+                }
+                {
+                    bilingual.enabled ?
+                        <div className={styles['bilingual-title']}>
+                            <BilingualTitle metadata={bilingual.metadata} originalName={name} />
+                            {bilingualEpisode && bilingualEpisodeName ?
+                                <BilingualTitle metadata={episodeBilingual.metadata} originalName={bilingualEpisodeName} compact={true} />
+                                : null}
+                        </div>
+                        : null
                 }
                 {
                     metadata !== undefined ? metadata : (typeof releaseInfo === 'string' && releaseInfo.length > 0) || (released instanceof Date && !isNaN(released.getTime())) || (typeof runtime === 'string' && runtime.length > 0) || linksGroups.has(CONSTANTS.IMDB_LINK_CATEGORY) ?
@@ -200,15 +216,25 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                         ))
                 }
                 {
-                    !compact && typeof description === 'string' && description.length > 0 ?
+                    bilingual.enabled ?
                         <div className={styles['description-container']}>
-                            <div className={styles['label-container']}>
-                                {t('SUMMARY')}
-                            </div>
-                            {description}
+                            <BilingualOverview
+                                metadata={displayBilingual.metadata}
+                                originalDescription={bilingualEpisode ? bilingualEpisodeOverview : description}
+                            />
+                            {displayBilingual.status === 'access-expired' ?
+                                <div role={'status'}>{t('BILINGUAL_ACCESS_EXPIRED', { defaultValue: '双语资料访问已过期，请重新进入私人入口。原资料仍可使用。' })}</div>
+                                : null}
                         </div>
-                        :
-                        null
+                        : !compact && typeof description === 'string' && description.length > 0 ?
+                            <div className={styles['description-container']}>
+                                <div className={styles['label-container']}>
+                                    {t('SUMMARY')}
+                                </div>
+                                {description}
+                            </div>
+                            :
+                            null
                 }
                 {children}
             </div>
@@ -291,6 +317,10 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
 MetaPreview.Placeholder = MetaPreviewPlaceholder;
 
 MetaPreview.propTypes = {
+    bilingualIdentity: PropTypes.object,
+    bilingualEpisode: PropTypes.object,
+    bilingualEpisodeName: PropTypes.string,
+    bilingualEpisodeOverview: PropTypes.string,
     metadata: PropTypes.node,
     children: PropTypes.node,
     actions: PropTypes.node,
