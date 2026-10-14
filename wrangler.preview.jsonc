@@ -12,7 +12,7 @@
         "run_worker_first": ["/api", "/api/*"]
     },
     "vars": {
-        "BILINGUAL_METADATA_ENABLED": "false"
+        "BILINGUAL_METADATA_ENABLED": "true"
     },
     "observability": {
         "enabled": false
