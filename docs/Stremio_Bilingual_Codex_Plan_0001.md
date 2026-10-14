@@ -944,3 +944,10 @@ Git 工作区：CLEAN / DIRTY
 - 真实回滚演练：关闭且已有 Secret 的版本 c602ae5a-82a5-4a92-8617-2991b1006618，其 RELEASE_SHA 为 1d1de2540d64b034fa6e0a24c2085ab4b0999fcd，开关 false，Secret 仅存在绑定名。回滚到此版本后，无需刷新，已显示译文自动撤销，保留原 Cinemeta 简介和原片源；随后恢复 ba440db6-2eee-4e3c-9e63-6e416780156c。两次 CLI 操作均成功，Access 匿名请求仍受保护。
 - 私人 HTTPS 本机服务起初 Loading；本人自行允许 Chrome 本机网络访问后，重新加载播放页恢复。访客 The Kid 实际播放超过 34 秒，1440×1072、readyState 4、error null，暂停成功。现有本机服务 4.21.2 Online；未更改服务配置或重启服务。声音本人仍选择稍后验收。
 - PR #1 已创建 draft，仅本 Fork personal-main；正式账号与 PWA 安装、稳定发布仍待完成。
+
+
+### 正式账号只读与个人实例准备
+
+- 本人自行登录私人预览的现有 Stremio 账号。继续观看和片库均可读取，片库可见真实中英文标题；只读观察 20 个已安装插件及 Trakt Scrobbling 已授权状态。未播放账号内影片，未执行收藏、已观看、进度、插件或 Trakt 变更；此项不声称新增 scrobble 已验收。
+- 个人实例先从干净 6dccb9fb345cced90ba15fa895f79853f3ae7678 构建关闭且无凭证部署，版本 8200085e-4a39-4789-81b1-3072e76a81cc。绑定本项目专用 Access 策略，应用 48831317-2be3-4a7f-b516-0d2278286f5b，All traffic；匿名首页、脚本、health、meta 全部 403 后才设置该实例 TMDB_READ_TOKEN Secret。
+- 两个实例均仅本项目专属资源；未启用账户级 Access，未接入其他项目或域名。个人启用配置与本收据一起提交，新候选先在 preview 验证再用于个人实例。
