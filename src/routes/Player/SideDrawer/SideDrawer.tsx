@@ -120,6 +120,7 @@ const SideDrawer = memo(forwardRef<HTMLDivElement, Props>(({ seriesInfo, classNa
             <div className={styles['info']}>
                 <MetaPreview
                     className={styles['side-drawer-meta-preview']}
+                    bilingualIdentity={isEpg ? undefined : { type: metaItem.type, id: metaItem.id, scope: 'meta' }}
                     compact={true}
                     name={getEpgTitle(isEpgVideo, previewVideo, metaItem)}
                     logo={metaItem.logo}
@@ -160,6 +161,7 @@ const SideDrawer = memo(forwardRef<HTMLDivElement, Props>(({ seriesInfo, classNa
                                         className={styles['video']}
                                         id={video.id}
                                         title={video.title}
+                                        bilingualIdentity={!isEpg && metaItem.type === 'series' ? { type: metaItem.type, id: metaItem.id, scope: 'episode', season: video.season, episode: video.episode } : undefined}
                                         thumbnail={video.thumbnail}
                                         season={video.season}
                                         episode={video.episode}

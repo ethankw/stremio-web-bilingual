@@ -122,7 +122,7 @@ const General = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
             />
             <Link
                 label={t('SETTINGS_SOURCE_CODE')}
-                href={`https://github.com/stremio/stremio-web/tree/${process.env.COMMIT_HASH}`}
+                href={`https://github.com/ethankw/stremio-web-bilingual/tree/${process.env.COMMIT_HASH}`}
             />
             <Link
                 label={t('TERMS_OF_SERVICE')}
@@ -160,6 +160,17 @@ const General = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
                         />
                     </Option>
             }
+        </Section>
+        <Section label={'About / Credits'}>
+            <div className={styles['credits']}>
+                <p>{t('BILINGUAL_FORK_NOTICE', { defaultValue: 'Stremio Web Bilingual is a personal fork of Stremio Web, not an official Stremio release.' })}</p>
+                <p>{t('BILINGUAL_SOURCE_LICENSE', { defaultValue: 'Based on Stremio Web {{version}}. Source modifications remain available under GPL-2.0.', version: process.env.VERSION })}</p>
+                <p>{t('BILINGUAL_BUILD', { defaultValue: 'Build: {{sha}}', sha: process.env.COMMIT_HASH })}</p>
+                <a href={'https://www.themoviedb.org'} target={'_blank'} rel={'noopener noreferrer'}>
+                    <img className={styles['tmdb-logo']} src={'images/tmdb-logo.svg'} alt={'The Movie Database (TMDB)'} />
+                </a>
+                <p>{t('BILINGUAL_TMDB_NOTICE', { defaultValue: 'This product uses the TMDB API but is not endorsed or certified by TMDB.' })}</p>
+            </div>
         </Section>
     </>;
 });

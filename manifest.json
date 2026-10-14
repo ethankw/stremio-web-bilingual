@@ -1,7 +1,7 @@
 {
-    "name": "Stremio Web",
-    "short_name": "Stremio",
-    "description": "Freedom To Stream",
+    "name": "Stremio Web Bilingual",
+    "short_name": "Stremio 双语",
+    "description": "Personal Stremio Web fork with English and Chinese metadata",
     "background_color": "#0c0b11",
     "theme_color": "#2a2843",
     "orientation": "any",

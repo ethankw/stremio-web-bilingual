@@ -1,0 +1,62 @@
+// Copyright (C) 2017-2026 Smart code 203358507
+// Modified by Ethan for this Stremio Web Bilingual project; GPL-2.0 license retained.
+
+.bilingual-title {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.15rem;
+
+    &.compact {
+        gap: 0.05rem;
+    }
+}
+
+.title-line {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--primary-foreground-color);
+    font-weight: 500;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.title-line-missing {
+    color: var(--primary-foreground-color);
+    opacity: 0.55;
+}
+
+.bilingual-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.overview-entry, .overview-original {
+    min-width: 0;
+}
+
+.overview-summary, .overview-label {
+    color: var(--primary-foreground-color);
+    font-weight: 600;
+}
+
+.overview-summary {
+    cursor: pointer;
+}
+
+.overview-copy {
+    margin: 0.45rem 0 0;
+    color: var(--primary-foreground-color);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.overview-missing {
+    color: var(--primary-foreground-color);
+    font-size: 0.9em;
+    opacity: 0.55;
+}

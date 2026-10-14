@@ -223,6 +223,10 @@ const MetaDetails = () => {
                                     <React.Fragment>
                                         <MetaPreview
                                             className={classnames(styles['meta-preview'], 'animation-fade-in')}
+                                            bilingualIdentity={{ type, id, scope: 'meta' }}
+                                            bilingualEpisode={type === 'series' && video !== null ? { type, id, scope: 'episode', season: video.season, episode: video.episode } : undefined}
+                                            bilingualEpisodeName={video?.title}
+                                            bilingualEpisodeOverview={video?.overview}
                                             name={metaDetails.metaItem.content.content.name}
                                             logo={metaDetails.metaItem.content.content.logo}
                                             runtime={metaDetails.metaItem.content.content.runtime}
@@ -261,6 +265,7 @@ const MetaDetails = () => {
                             <VideosList
                                 className={styles['videos-list']}
                                 metaItem={metaDetails.metaItem}
+                                bilingualIdentity={{ type: metaPath.type, id: metaPath.id }}
                                 libraryItem={metaDetails.libraryItem}
                                 season={season}
                                 selectedVideoId={metaDetails.libraryItem?.state?.video_id}

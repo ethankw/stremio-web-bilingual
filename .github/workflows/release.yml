@@ -2,6 +2,7 @@ name: Release
 
 on:
   release:
+    if: github.repository == 'Stremio/stremio-web'
     types: [published]
 
 jobs:

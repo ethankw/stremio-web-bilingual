@@ -4,3 +4,13 @@
 /npm-debug.log
 .DS_Store
 .prettierignore
+
+# Personal bilingual client: credentials and local-only runtime output
+.dev.vars*
+.env*
+!.env.example
+!.dev.vars.example
+.wrangler/
+.worker-tests/
+.private-test-output/
+__pycache__/

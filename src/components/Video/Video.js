@@ -16,8 +16,18 @@ const { formatEpgTimeRange } = require('stremio/common/EPG');
 const { getInterfaceRect } = require('stremio/common/interfaceScale');
 const VideoPlaceholder = require('./VideoPlaceholder');
 const styles = require('./styles');
+const { useBilingualMetadata, getBilingualTitleText } = require('stremio/common/bilingual');
+const { BilingualTitle } = require('stremio/components/BilingualMetadata');
 
-const VideoLabel = React.forwardRef(({ shouldScroll, ...props }, ref) => {
+const VideoLabel = React.forwardRef(({ shouldScroll, observerRef, ...props }, ref) => {
+    const attachRef = React.useCallback((node) => {
+        if (typeof ref === 'function') {
+            ref(node);
+        } else if (ref) {
+            ref.current = node;
+        }
+        if (observerRef) observerRef(node);
+    }, [ref, observerRef]);
     React.useEffect(() => {
         if (shouldScroll && ref.current) {
             // Keep selection scrolling inside the list. scrollIntoView also
@@ -36,19 +46,21 @@ const VideoLabel = React.forwardRef(({ shouldScroll, ...props }, ref) => {
         }
     }, [shouldScroll, ref]);
 
-    return <Button {...props} ref={ref} />;
+    return <Button {...props} ref={attachRef} />;
 });
 
 VideoLabel.propTypes = {
+    observerRef: PropTypes.func,
     shouldScroll: PropTypes.bool,
 };
 
-const Video = ({ className, id, title, thumbnail, season, episode, released, upcoming, watched, progress, scheduled, seasonWatched, selected, deepLinks, isEpg, isNow, startTime, endTime, onSelect, onMarkVideoAsWatched, onMarkSeasonAsWatched, ...props }) => {
+const Video = ({ className, id, title, thumbnail, season, episode, released, upcoming, watched, progress, scheduled, seasonWatched, selected, deepLinks, isEpg, isNow, startTime, endTime, onSelect, onMarkVideoAsWatched, onMarkSeasonAsWatched, bilingualIdentity, ...props }) => {
     const routeFocused = useRouteFocused();
     const profile = useProfile();
     const navigate = useNavigate();
     const platform = usePlatform();
     const { t } = useTranslation();
+    const bilingual = useBilingualMetadata(isEpg ? undefined : bilingualIdentity, { lazy: true, priority: 1 });
 
     const [menuOpen, openMenu, closeMenu, toggleMenu] = useBinaryState(false);
 
@@ -128,7 +140,7 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
             null;
 
         return (
-            <VideoLabel {...props} ref={ref} shouldScroll={selected && (!watched || !!progress)} className={classnames(className, styles['video-container'], { [styles['selected']]: selected, 'active': menuOpen })} title={title}>
+            <VideoLabel {...props} ref={ref} observerRef={bilingual.ref} shouldScroll={selected && (!watched || !!progress)} className={classnames(className, styles['video-container'], { [styles['selected']]: selected, 'active': menuOpen })} title={bilingual.enabled ? getBilingualTitleText(bilingual.metadata, title || id, bilingual.settings.titleOrder) : title}>
                 {
                     typeof thumbnail === 'string' && thumbnail.length > 0 ?
                         <div className={styles['thumbnail-container']}>
@@ -157,9 +169,9 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
                         null
                 }
                 <div className={styles['info-container']}>
-                    <div className={styles['title-container']}>
+                    <div className={classnames(styles['title-container'], { [styles['bilingual-title-container']]: bilingual.enabled })}>
                         {episode !== null && !isNaN(episode) ? `${episode}. ` : null}
-                        {typeof title === 'string' && title.length > 0 ? title : id}
+                        {bilingual.enabled ? <BilingualTitle metadata={bilingual.metadata} originalName={title || id} compact={true} /> : typeof title === 'string' && title.length > 0 ? title : id}
                     </div>
                     <div className={styles['flex-row-container']}>
                         {
@@ -227,7 +239,7 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
                 {children}
             </VideoLabel>
         );
-    }, [deepLinks, playButtonOnClick, playButtonOnKeyDown, selected, menuOpen, endTime, isEpg, isNow, profile.settings.hideSpoilers, profile.settings.interfaceLanguage, season, startTime, t]);
+    }, [deepLinks, playButtonOnClick, playButtonOnKeyDown, selected, menuOpen, endTime, isEpg, isNow, profile.settings.hideSpoilers, profile.settings.interfaceLanguage, season, startTime, t, bilingual.enabled, bilingual.metadata, bilingual.ref, bilingual.settings.titleOrder]);
     const renderMenu = React.useMemo(() => function renderMenu() {
         return (
             <div className={styles['context-menu-content']} onPointerDown={popupMenuOnPointerDown} onContextMenu={popupMenuOnContextMenu} onClick={popupMenuOnClick} onKeyDown={popupMenuOnKeyDown}>
@@ -280,6 +292,7 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
 Video.Placeholder = VideoPlaceholder;
 
 Video.propTypes = {
+    bilingualIdentity: PropTypes.object,
     className: PropTypes.string,
     id: PropTypes.string,
     title: PropTypes.string,
