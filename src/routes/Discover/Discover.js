@@ -52,6 +52,8 @@ const Discover = () => {
     const [discover, loadNextPage] = useDiscover(urlParams, catalogQueryParams);
     const [selectInputs, hasNextPage] = useSelectableInputs(discover);
     const [filtersOpen, openFilters, closeFilters] = useBinaryState(false);
+    const genreInput = selectInputs.find(({ id }) => id === 'extra:genre');
+    const menuInputs = selectInputs.filter(({ id }) => id !== 'extra:genre');
     const selectedTypeOption = selectInputs[0].options.find(({ value }) => value === selectInputs[0].value);
     const selectedCatalogOption = selectInputs[1].options.find(({ value }) => value === selectInputs[1].value);
     const activeFilterCount = selectInputs.filter(({ active }) => active).length;
@@ -246,6 +248,10 @@ const Discover = () => {
                         className={classnames({ 'selected': selectedMetaItemIndex === index })}
                         type={metaItem.type}
                         name={metaItem.name}
+                        releaseInfo={metaItem.releaseInfo}
+                        released={metaItem.released}
+                        links={metaItem.links}
+                        imdbRating={metaItem.imdbRating}
                         poster={metaItem.poster}
                         posterShape={metaItem.posterShape}
                         playname={selectedMetaItemIndex === index}
@@ -357,7 +363,7 @@ const Discover = () => {
                                 {activeFilterCount > 0 && <span className={styles['filter-count']}>{activeFilterCount}</span>}
                             </Button>
                         </div> : <div className={styles['selectable-inputs']}>
-                            {selectInputs.map(({ title, options, value, onSelect }, index) => (
+                            {menuInputs.map(({ title, options, value, onSelect }, index) => (
                                 <MultiselectMenu
                                     key={index}
                                     className={styles['select-input']}
@@ -386,6 +392,17 @@ const Discover = () => {
                                 null
                         }
                     </div>
+                    {genreInput && <div className={styles['genre-chips']} role={'group'} aria-label={genreInput.label}>
+                        {genreInput.options.map((option) => (
+                            <button
+                                key={option.value}
+                                type={'button'}
+                                className={styles['genre-chip']}
+                                aria-pressed={option.value === genreInput.value}
+                                onClick={() => genreInput.onSelect(option.value)}
+                            >{option.label}</button>
+                        ))}
+                    </div>}
                     {
                         discover.catalog !== null && !discover.catalog.installed ?
                             <div className={styles['missing-addon-warning-container']}>
@@ -431,11 +448,11 @@ const Discover = () => {
                     :
                     null
             }
-            <FiltersSheet inputs={selectInputs} show={isMobile && filtersOpen} onCloseRequest={closeFilters} />
+            <FiltersSheet inputs={menuInputs} show={isMobile && filtersOpen} onCloseRequest={closeFilters} />
             {
                 filtersOpen && !isMobile ?
                     <ModalDialog title={t('CATALOG_FILTERS')} className={styles['selectable-inputs-modal']} onCloseRequest={closeFilters}>
-                        {selectInputs.map(({ title, options, value, onSelect }, index) => (
+                        {menuInputs.map(({ title, options, value, onSelect }, index) => (
                             <MultiselectMenu
                                 key={index}
                                 className={styles['select-input']}

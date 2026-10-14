@@ -59,7 +59,7 @@ const mapSelectableInputs = (discover, t, navigate) => {
             active: typeof selectedExtra?.value === 'string',
             isRequired: isRequired,
             options: options.map(({ value, deepLinks }) => ({
-                label: typeof value === 'string' ? t.string(value) : t.string('NONE'),
+                label: typeof value === 'string' ? t.string(value) : t.string(name === 'genre' ? 'TYPE_ALL' : 'NONE'),
                 default: value === null,
                 value: JSON.stringify({
                     href: deepLinks.discover,
@@ -87,7 +87,7 @@ const useSelectableInputs = (discover) => {
     const navigate = useNavigate();
     const selectableInputs = React.useMemo(() => {
         return mapSelectableInputs(discover, t, navigate);
-    }, [discover.selected, discover.selectable]);
+    }, [discover.selected, discover.selectable, t.string, t.stringWithPrefix, t.catalogTitle, navigate]);
     return selectableInputs;
 };
 

@@ -22,8 +22,11 @@ const { default: WebUpdateScreen } = require('./App/WebUpdateScreen');
 const { CoreProvider } = require('./core');
 const { FileDropProvider, PlatformProvider } = require('./common');
 
+const localChinese = require('./locales/zh-CN.json');
+const localChineseExtra = require('./locales/zh-CN-extra.json');
+
 const translations = Object.fromEntries(Object.entries(stremioTranslations()).map(([key, value]) => [key, {
-    translation: value
+    translation: key === 'zh-CN' ? { ...value, ...localChinese, ...localChineseExtra } : value
 }]));
 
 i18n

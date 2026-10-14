@@ -161,7 +161,7 @@ const General = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
                     </Option>
             }
         </Section>
-        <Section label={'About / Credits'}>
+        <Section label={t('BILINGUAL_ABOUT', { defaultValue: 'About / Credits' })}>
             <div className={styles['credits']}>
                 <p>{t('BILINGUAL_FORK_NOTICE', { defaultValue: 'Stremio Web Bilingual is a personal fork of Stremio Web, not an official Stremio release.' })}</p>
                 <p>{t('BILINGUAL_SOURCE_LICENSE', { defaultValue: 'Based on Stremio Web {{version}}. Source modifications remain available under GPL-2.0.', version: process.env.VERSION })}</p>

@@ -500,3 +500,36 @@
         }
     }
 }
+
+.genre-chips {
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0 1.5rem 1.25rem;
+}
+
+.genre-chip {
+    flex: none;
+    min-height: 2.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 2rem;
+    background: var(--overlay-color);
+    color: var(--primary-foreground-color);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover {
+        border-color: var(--primary-foreground-color);
+    }
+
+    &[aria-pressed='true'] {
+        background: var(--secondary-accent-color);
+    }
+
+    &:focus-visible {
+        outline: var(--focus-outline-size) solid var(--primary-foreground-color);
+        outline-offset: 2px;
+    }
+}
