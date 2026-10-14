@@ -1,3 +1,16 @@
+# Stremio Web Bilingual 个人 Fork
+
+基于官方 `v5.0.0-beta.42`，保留原 Stremio 核心与播放机制，在显示层补充有 TMDB 语言证据的中英文资料。此仓库不是官方发布；修改保持 GPL-2.0，TMDB 署名见应用 About/Credits。
+
+- 本地开发：`npx --yes pnpm@11.8.0 install --frozen-lockfile`，安全配置本项目 `.dev.vars` 后运行 `npx --yes pnpm@11.8.0 dev:personal`，访问 `http://localhost:18433/`。
+- 私人入口：`https://stremio-bilingual-personal.ethankw.workers.dev/`；预览：`https://stremio-bilingual-preview.ethankw.workers.dev/`。先 Access 登录，再登录自己的 Stremio 账号。各入口的实际发布状态以部署收据为准。
+- 开发验证：`npx --yes pnpm@11.8.0 verify:personal`。
+- [使用、维护和回滚](docs/Personal_Runbook.md)、[验收记录](docs/Acceptance.md)、[执行规范及阶段收据](docs/Stremio_Bilingual_Codex_Plan_0001.md)。
+
+缺失翻译保留原资料，不按标题猜身份。此 Fork 不会改变官方客户端界面；跨设备播放不在第一版范围。以下保留上游项目说明。
+
+---
+
 <div align="center">
 
 <img src="/assets/images/stremio_symbol.png" width="90" alt="Stremio logo">
