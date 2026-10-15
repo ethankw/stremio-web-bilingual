@@ -4,7 +4,7 @@
 const DEFAULT_LOCALE = 'zh-CN';
 const ENGLISH_LOCALE = 'en-US';
 const CACHE_SCHEMA_VERSION = 1;
-const MATCH_ALGORITHM_VERSION = 'imdb-exact-v1';
+const MATCH_ALGORITHM_VERSION = 'typed-id-exact-v2';
 const SUCCESS_TTL = 24 * 60 * 60 * 1000;
 const UNMATCHED_TTL = 30 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 512;
@@ -35,6 +35,13 @@ const getClockValue = (clock) => {
     return value instanceof Date ? value.getTime() : Number(value);
 };
 
+// Keep namespace validation aligned with worker/identity.ts.
+const tmdbIdFrom = (id) => {
+    if (typeof id !== 'string' || !/^tmdb:[1-9]\d{0,15}$/.test(id)) return null;
+    const value = Number(id.slice(5));
+    return Number.isSafeInteger(value) ? value : null;
+};
+
 const normalizeIdentity = (identity) => {
     if (!isRecord(identity)) {
         return { valid: false, reason: 'identity' };
@@ -51,7 +58,7 @@ const normalizeIdentity = (identity) => {
         :
         identity.scope;
 
-    if (!SUPPORTED_TYPES.has(type) || typeof id !== 'string' || !/^tt\d{7,10}$/.test(id) || !SUPPORTED_SCOPES.has(scope)) {
+    if (!SUPPORTED_TYPES.has(type) || typeof id !== 'string' || (!/^tt\d{7,10}$/.test(id) && tmdbIdFrom(id) === null) || !SUPPORTED_SCOPES.has(scope)) {
         return { valid: false, reason: 'identity' };
     }
 
@@ -153,7 +160,7 @@ const validateMetadata = (metadata, identity) => {
     const hasValidTmdbId = typeof tmdbId === 'number' && Number.isSafeInteger(tmdbId) && tmdbId > 0;
     const fieldsAreMissing = [metadata.title.en, metadata.title.zh, metadata.overview.en, metadata.overview.zh].every((value) => value.status === 'missing' && value.text === null && value.effectiveLocale === null && value.source === null && value.evidence === null);
 
-    if (metadata.matchStatus === 'matched' && !hasValidTmdbId) {
+    if (metadata.matchStatus === 'matched' && (!hasValidTmdbId || (tmdbIdFrom(identity.id) !== null && tmdbIdFrom(identity.id) !== tmdbId))) {
         return false;
     }
 

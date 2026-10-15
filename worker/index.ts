@@ -1,3 +1,4 @@
+import { isSupportedMediaId } from './identity';
 import { MetadataCache } from './cache';
 import { DEFAULT_REQUEST_BUDGET_MS, MAX_TMDB_RESPONSE_BYTES, TmdbFailure, resolveMetadata, resolvePeople } from './tmdb';
 import type {
@@ -9,7 +10,7 @@ import type {
 } from './types';
 
 const SCHEMA_VERSION = 1;
-const MATCH_ALGORITHM_VERSION = 'imdb-exact-v1';
+const MATCH_ALGORITHM_VERSION = 'typed-id-exact-v2';
 const DEFAULT_LOCALE = 'zh-CN';
 const MAX_RELEASE_SHA_LENGTH = 256;
 
@@ -101,7 +102,7 @@ const parseMetadataRequest = (url: URL, scope: MetadataIdentity['scope']): Metad
     const type = requiredQueryValue(values, 'type');
     const id = requiredQueryValue(values, 'id');
     const zh = requiredQueryValue(values, 'zh');
-    if ((type !== 'movie' && type !== 'series') || id === null || !/^tt\d{7,10}$/.test(id) || zh !== DEFAULT_LOCALE) {
+    if ((type !== 'movie' && type !== 'series') || id === null || !isSupportedMediaId(id) || zh !== DEFAULT_LOCALE) {
         return null;
     }
 

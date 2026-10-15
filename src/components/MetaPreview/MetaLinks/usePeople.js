@@ -2,6 +2,7 @@
 // Modified by Ethan for this Stremio Web Bilingual project; GPL-2.0 license retained.
 
 const React = require('react');
+const { normalizeIdentity } = require('stremio/common/bilingual/client');
 const cache = new Map();
 const EMPTY = [];
 const MAX_ENTRIES = 64;
@@ -9,7 +10,7 @@ const MAX_ENTRIES = 64;
 const usePeople = (identity, enabled) => {
     const type = identity?.type || identity?.stremioType;
     const id = identity?.id || identity?.stremioId;
-    const valid = enabled && (type === 'movie' || type === 'series') && /^tt\d{7,10}$/.test(id || '');
+    const valid = enabled && normalizeIdentity({ type, id, scope: 'meta' }).valid;
     const key = valid ? `${type}:${id}` : '';
     const [state, setState] = React.useState({ key: '', people: EMPTY });
     React.useEffect(() => {
@@ -22,7 +23,7 @@ const usePeople = (identity, enabled) => {
         const controller = new AbortController();
         let cancelled = false;
         const timer = setTimeout(() => controller.abort(), 8500);
-        fetch(`/api/bilingual/v1/people?type=${type}&id=${id}&zh=zh-CN`, {
+        fetch(`/api/bilingual/v1/people?type=${type}&id=${encodeURIComponent(id)}&zh=zh-CN`, {
             signal: controller.signal,
             headers: { Accept: 'application/json' },
         }).then(async (response) => {
