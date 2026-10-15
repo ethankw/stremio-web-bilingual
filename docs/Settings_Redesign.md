@@ -6,6 +6,8 @@ Search covers all destinations. Opening settings, searching and changing destina
 
 ## Addon compatibility
 
+Configuration buttons for installed addons route to the same settings entry without placing their potentially private URLs in the address bar. Uninstalled addons retain their existing configuration/install flow.
+
 Installed instances remain separate and no install/uninstall is dispatched by this screen. Known, version-bound Torrentio (0.0.15) and TMDB addon (3.1.7) URL formats can expose a draft editor with common and advanced options. Unknown fields and credentials remain unchanged and are not rendered. Unsupported hosts, versions, aliases, data types and opaque configurations fall back to provider settings when the addon declares them.
 
 A generated draft is **not a saved addon update**. The existing core replaces descriptors by transport URL; changed configuration URLs identify another instance. This screen therefore opens the provider's configuration flow explicitly and never uninstalls/reorders an existing addon to simulate atomic replacement. Generic manifest.config fields alone do not enable an editor until that provider's encode/decode and return flow have been verified.

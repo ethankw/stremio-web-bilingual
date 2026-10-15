@@ -10,6 +10,7 @@ const { useCore } = require('stremio/core');
 const { usePlatform, useBinaryState, withCoreSuspender } = require('stremio/common');
 const { AddonDetailsModal, Button, Image, MainNavBars, ModalDialog, SearchBar, SharePrompt, TextInput, MultiselectMenu } = require('stremio/components');
 const useToast = require('stremio/common/Toast/useToast');
+const { openAddonSettings } = require('stremio/common/addonSettingsNavigation');
 const receivesWatchActivity = require('stremio/components/AddonDetailsModal/receivesWatchActivity');
 const Addon = require('./Addon');
 const useInstalledAddons = require('./useInstalledAddons');
@@ -104,6 +105,7 @@ const Addons = () => {
         });
     }, []);
     const onAddonConfigure = React.useCallback((event) => {
+        if (event.dataset.addon.installed && openAddonSettings(event.dataset.addon.transportUrl)) return;
         platform.openExternal(event.dataset.addon.transportUrl.replace('manifest.json', 'configure'));
     }, []);
     const onAddonOpen = React.useCallback((event) => {

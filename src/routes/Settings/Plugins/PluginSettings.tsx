@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getRequestedAddonSettings, clearRequestedAddonSettings } from 'stremio/common/addonSettingsNavigation';
 import { usePlatform } from 'stremio/common';
 import { Button } from 'stremio/components';
 import useInstalledAddons from '../../Addons/useInstalledAddons';
@@ -73,6 +74,20 @@ const PluginSettings = () => {
     const installed = useInstalledAddons(installedParams);
     const { state } = useSettingsPresentation();
     const [editing, setEditing] = useState<string | null>(null);
+    const [requested, setRequested] = useState<string | null>(getRequestedAddonSettings);
+    const [highlighted, setHighlighted] = useState<string | null>(null);
+    const card = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const addon = installed.catalog.find((item) => item.transportUrl === requested);
+        if (!addon) return;
+        clearRequestedAddonSettings(addon.transportUrl);
+        setRequested(null);
+        setHighlighted(addon.transportUrl);
+        if (readConfiguration(addon)) setEditing(addon.transportUrl);
+    }, [installed.catalog, requested]);
+    useEffect(() => {
+        if (highlighted) card.current?.scrollIntoView({ block: 'center' });
+    }, [highlighted]);
     return <Section label={'SETTINGS_MY_ADDONS'}>
         <p className={styles['hint']}>{t('SETTINGS_PLUGIN_SCOPE')}</p>
         <div className={styles['list']}>
@@ -81,7 +96,7 @@ const PluginSettings = () => {
                 const configurable = addon.manifest.behaviorHints?.configurable || addon.manifest.behaviorHints?.configurationRequired || configuration;
                 const external = configurable ? configurationUrl(addon.transportUrl) : null;
                 const editingThis = editing === addon.transportUrl;
-                return <div className={styles['card']} key={addon.transportUrl}>
+                return <div className={styles['card']} ref={highlighted === addon.transportUrl ? card : null} key={addon.transportUrl}>
                     <div className={styles['heading']}><h3>{addon.manifest.name}</h3><span>{addon.manifest.version}</span></div>
                     <p>{(addon.manifest as AddonManifest & { resources?: (string | { name: string })[] }).resources?.map((resource) => t(`SETTINGS_PLUGIN_RESOURCE_${(typeof resource === 'string' ? resource : resource.name).toUpperCase()}`)).join(' · ') || addon.manifest.types.join(' / ')}</p>
                     <p>{t(configuration ? 'SETTINGS_PLUGIN_NATIVE_AVAILABLE' : addon.manifest.behaviorHints?.configurable || external ? 'SETTINGS_PLUGIN_EXTERNAL' : 'SETTINGS_PLUGIN_NO_CONFIGURATION', { number: index + 1 })}</p>
