@@ -13,7 +13,7 @@ const { default: useRouteFocused } = require('stremio/common/useRouteFocused');
 const StreamPlaceholder = require('./StreamPlaceholder');
 const styles = require('./styles');
 
-const Stream = ({ className = '', compact = false, isEpg = false, videoId = undefined, videoReleased = undefined, addonName, name, description, thumbnail = undefined, progress, deepLinks, externalPlayerCallbackCanMarkWatched, ...props }) => {
+const Stream = ({ className = '', compact = false, isEpg = false, videoId = undefined, videoReleased = undefined, addonName, name, description, sourceClassification = undefined, thumbnail = undefined, progress, deepLinks, externalPlayerCallbackCanMarkWatched, ...props }) => {
     const profile = useProfile();
     const toast = useToast();
     const platform = usePlatform();
@@ -214,7 +214,21 @@ const Stream = ({ className = '', compact = false, isEpg = false, videoId = unde
         }
 
         return (
-            <Button className={classnames(className, styles['stream-container'], { 'active': menuOpen })} title={addonName} href={href} target={target} download={download} onClick={onClick} {...props}>
+            <Button className={classnames(className, styles['stream-container'], { 'active': menuOpen, [styles['with-source']]: sourceClassification !== undefined })} title={addonName} href={href} target={target} download={download} onClick={onClick} {...props}>
+                {sourceClassification !== undefined && <div className={styles['source-column']}>
+                    {sourceClassification && <span
+                        className={classnames(styles['source-chip'], styles[`source-${sourceClassification.kind}`])}
+                        title={sourceClassification.kind === 'camera'
+                            ? t('STREAM_SOURCE_CAMERA_HINT', { defaultValue: 'Camera-source tag: {{source}}. Inferred from the release name; video not verified.', source: sourceClassification.source })
+                            : sourceClassification.kind === 'digital'
+                                ? t('STREAM_SOURCE_DIGITAL_HINT', { defaultValue: 'Digital-source tag: {{source}}. Inferred from the release name; resolution and quality not verified.', source: sourceClassification.source })
+                                : t('STREAM_SOURCE_UNKNOWN_HINT', { defaultValue: 'The release name does not establish an HD digital or camera source.' })}
+                    >{sourceClassification.kind === 'camera'
+                            ? t('STREAM_SOURCE_CAMERA', { defaultValue: 'CAM' })
+                            : sourceClassification.kind === 'digital'
+                                ? t('STREAM_SOURCE_DIGITAL', { defaultValue: 'HD' })
+                                : t('STREAM_SOURCE_UNKNOWN', { defaultValue: 'Unknown' })}</span>}
+                </div>}
                 <div className={styles['info-container']}>
                     {
                         typeof thumbnail === 'string' && thumbnail.length > 0 ?
@@ -246,7 +260,7 @@ const Stream = ({ className = '', compact = false, isEpg = false, videoId = unde
                 {children}
             </Button>
         );
-    }, [compact, thumbnail, progress, addonName, name, description, href, target, download, onClick, menuOpen]);
+    }, [compact, thumbnail, progress, addonName, name, description, sourceClassification, href, target, download, onClick, menuOpen]);
 
     const renderMenu = React.useMemo(() => function renderMenu() {
         return (
@@ -316,6 +330,7 @@ Stream.propTypes = {
     addonName: PropTypes.string,
     name: PropTypes.string,
     description: PropTypes.string,
+    sourceClassification: PropTypes.shape({ kind: PropTypes.oneOf(['camera', 'digital', 'unknown']).isRequired, source: PropTypes.string }),
     thumbnail: PropTypes.string,
     progress: PropTypes.number,
     deepLinks: PropTypes.shape({
