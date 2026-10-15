@@ -21,6 +21,48 @@
     margin-bottom: 0.5rem;
     border-radius: var(--border-radius);
 
+    &.with-source {
+        flex-wrap: nowrap;
+        min-width: 0;
+
+        .description-container {
+            min-width: 0;
+        }
+    }
+
+    .source-column {
+        flex: 0 0 4.5rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .source-chip {
+        display: inline-block;
+        max-width: 100%;
+        padding: 0.3rem 0.55rem;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1.3;
+        white-space: nowrap;
+    }
+
+    .source-digital {
+        color: #a5e5ca;
+        background: rgba(55, 155, 110, 0.14);
+    }
+
+    .source-camera {
+        color: #f2c087;
+        background: rgba(190, 120, 45, 0.14);
+    }
+
+    .source-unknown {
+        color: var(--primary-foreground-color);
+        opacity: 0.6;
+    }
+
     &:hover,
     &:focus {
         background-color: var(--overlay-color);
@@ -173,6 +215,25 @@
 
 @media only screen and (max-width: @small) {
     .stream-container {
+        &.with-source {
+            gap: 0.6rem;
+            padding-left: 0.6rem;
+            padding-right: 0.6rem;
+
+            .source-column {
+                flex-basis: 4rem;
+            }
+
+            .info-container .addon-name {
+                width: 5rem;
+            }
+
+            .icon {
+                width: 1.75rem;
+                height: 1.75rem;
+                padding: 0.25rem;
+            }
+        }
         .description-container {
             font-size: 0.9rem;
         }

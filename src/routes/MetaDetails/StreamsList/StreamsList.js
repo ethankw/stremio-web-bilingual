@@ -11,6 +11,7 @@ const { default: Icon } = require('@stremio/stremio-icons/react');
 const { Button, Image, MultiselectMenu } = require('stremio/components');
 const { useCore } = require('stremio/core');
 const Stream = require('./Stream');
+const classifyStreamSource = require('./classifyStreamSource');
 const styles = require('./styles');
 const { usePlatform, useProfile } = require('stremio/common');
 const { default: SeasonEpisodePicker } = require('../EpisodePicker');
@@ -189,6 +190,7 @@ const StreamsList = ({ className, video, type, externalPlayerCallbackCanMarkWatc
                                             videoReleased={video?.released}
                                             addonName={stream.addonName}
                                             name={stream.name}
+                                            sourceClassification={type === 'movie' || type === 'series' ? classifyStreamSource(stream) : undefined}
                                             description={stream.description}
                                             thumbnail={stream.thumbnail}
                                             progress={stream.progress}

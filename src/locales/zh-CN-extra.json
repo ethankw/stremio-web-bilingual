@@ -23,5 +23,11 @@
     "BILINGUAL_CLEAR_CACHE": "清除双语资料缓存",
     "BILINGUAL_ABOUT": "关于与致谢",
     "LIBRARY_EMPTY_WATCHED": "此分类暂无已观看内容",
-    "LIBRARY_EMPTY_UNWATCHED": "此分类暂无未观看内容"
+    "LIBRARY_EMPTY_UNWATCHED": "此分类暂无未观看内容",
+    "STREAM_SOURCE_CAMERA": "偷拍版",
+    "STREAM_SOURCE_DIGITAL": "高清版",
+    "STREAM_SOURCE_UNKNOWN": "未知",
+    "STREAM_SOURCE_CAMERA_HINT": "命名含偷拍来源标记：{{source}}。仅根据资源命名推断，未验证实际视频。",
+    "STREAM_SOURCE_DIGITAL_HINT": "命名含数码片源标记：{{source}}。仅根据资源命名推断，未验证实际分辨率与画质。",
+    "STREAM_SOURCE_UNKNOWN_HINT": "资源命名不足以确认是高清数码片源还是偷拍片源。"
 }
