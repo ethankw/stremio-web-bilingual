@@ -9,6 +9,7 @@ const { withCoreSuspender } = require('stremio/common/CoreSuspender');
 const { usePlatform } = require('stremio/common/Platform');
 const AddonDetailsWithRemoteAndLocalAddon = withRemoteAndLocalAddon(require('./AddonDetails'));
 const useAddonDetails = require('./useAddonDetails');
+const { openAddonSettings } = require('stremio/common/addonSettingsNavigation');
 const receivesWatchActivity = require('./receivesWatchActivity');
 const styles = require('./styles');
 
@@ -87,7 +88,9 @@ const AddonDetailsModal = ({ transportUrl, onCloseRequest }) => {
                 label: t('ADDON_CONFIGURE'),
                 props: {
                     onClick: (event) => {
-                        platform.openExternal(transportUrl.replace('manifest.json', 'configure'));
+                        if (addonDetails.localAddon === null || !openAddonSettings(transportUrl)) {
+                            platform.openExternal(transportUrl.replace('manifest.json', 'configure'));
+                        }
                         if (typeof onCloseRequest === 'function') {
                             onCloseRequest({
                                 type: 'configure',

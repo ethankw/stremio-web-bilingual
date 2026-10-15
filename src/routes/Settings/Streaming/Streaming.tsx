@@ -4,6 +4,7 @@ import Icon from '@stremio/stremio-icons/react';
 import { Button, MultiselectMenu } from 'stremio/components';
 import { useToast } from 'stremio/common';
 import { Section, Option } from '../components';
+import { Setting } from '../Presentation';
 import URLsManager from './URLsManager';
 import useStreamingOptions from './useStreamingOptions';
 import styles from './Streaming.less';
@@ -41,8 +42,8 @@ const Streaming = forwardRef<HTMLDivElement, Props>(({ profile, streamingServer 
     }, [streamingServer.remoteUrl]);
 
     return (
-        <Section ref={ref} label={'SETTINGS_NAV_STREAMING'}>
-            <URLsManager selectedUrl={profile.settings.streamingServerUrl} settings={streamingServer.settings} />
+        <Section settingGroup={'streaming'} ref={ref} label={'SETTINGS_NAV_STREAMING'}>
+            <Setting id={'SETTINGS_SERVER_ADD_URL'}><URLsManager selectedUrl={profile.settings.streamingServerUrl} settings={streamingServer.settings} /></Setting>
             {
                 streamingServerRemoteUrlInput.value !== null &&
                     <Option className={styles['configure-input-container']} label={'SETTINGS_REMOTE_URL'}>

@@ -32,11 +32,11 @@ const Interface = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) =>
     } = useInterfaceOptions(profile);
 
     return (
-        <Section ref={ref} label={'INTERFACE'}>
-            <Option label={t('BILINGUAL_ENABLED', { defaultValue: '影视资料双语显示 / Bilingual metadata' })}>
+        <Section settingGroup={'interface'} ref={ref} label={'INTERFACE'}>
+            <Option label={'BILINGUAL_ENABLED'}>
                 <Toggle {...bilingualToggle} />
             </Option>
-            <Option label={t('BILINGUAL_TITLE_ORDER', { defaultValue: '标题顺序 / Title order' })}>
+            <Option label={'BILINGUAL_TITLE_ORDER'}>
                 <MultiselectMenu
                     className={'multiselect'}
                     value={bilingualSettings.titleOrder}
@@ -47,7 +47,7 @@ const Interface = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) =>
                     onSelect={(value: string) => updateBilingualSettings({ titleOrder: value })}
                 />
             </Option>
-            <Option label={t('BILINGUAL_OVERVIEW_ORDER', { defaultValue: '简介顺序 / Description order' })}>
+            <Option label={'BILINGUAL_OVERVIEW_ORDER'}>
                 <MultiselectMenu
                     className={'multiselect'}
                     value={bilingualSettings.overviewOrder}
@@ -58,7 +58,7 @@ const Interface = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) =>
                     onSelect={(value: string) => updateBilingualSettings({ overviewOrder: value })}
                 />
             </Option>
-            <Option label={t('BILINGUAL_CACHE', { defaultValue: '双语资料缓存 / Metadata cache' })}>
+            <Option label={'BILINGUAL_CACHE'}>
                 <Button onClick={clearCache}>{t('BILINGUAL_CLEAR_CACHE', { defaultValue: '清除双语资料缓存 / Clear metadata cache' })}</Button>
             </Option>
             <Option label={'SETTINGS_UI_LANGUAGE'}>
@@ -74,7 +74,7 @@ const Interface = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) =>
                 shell.active &&
                     <Option label={'SETTINGS_QUIT_ON_CLOSE'}>
                         <Toggle
-                            tabIndex={-1}
+                            tabIndex={0}
                             {...quitOnCloseToggle}
                         />
                     </Option>
@@ -83,20 +83,20 @@ const Interface = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) =>
                 shell.active &&
                     <Option label={'SETTINGS_FULLSCREEN_EXIT'}>
                         <Toggle
-                            tabIndex={-1}
+                            tabIndex={0}
                             {...escExitFullscreenToggle}
                         />
                     </Option>
             }
             <Option label={'SETTINGS_BLUR_UNWATCHED_IMAGE'}>
                 <Toggle
-                    tabIndex={-1}
+                    tabIndex={0}
                     {...hideSpoilersToggle}
                 />
             </Option>
             <Option label={'SETTINGS_GAMEPAD'}>
                 <Toggle
-                    tabIndex={-1}
+                    tabIndex={0}
                     {...gamepadSupportToggle}
                 />
             </Option>
