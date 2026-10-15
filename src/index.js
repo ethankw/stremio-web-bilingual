@@ -24,9 +24,10 @@ const { FileDropProvider, PlatformProvider } = require('./common');
 
 const localChinese = require('./locales/zh-CN.json');
 const localChineseExtra = require('./locales/zh-CN-extra.json');
+const settingsEnglish = require('./locales/settings-en.json');
 
 const translations = Object.fromEntries(Object.entries(stremioTranslations()).map(([key, value]) => [key, {
-    translation: key === 'zh-CN' ? { ...value, ...localChinese, ...localChineseExtra } : value
+    translation: key === 'zh-CN' ? { ...value, ...localChinese, ...localChineseExtra } : key === 'en-US' ? { ...value, ...settingsEnglish } : value
 }]));
 
 i18n

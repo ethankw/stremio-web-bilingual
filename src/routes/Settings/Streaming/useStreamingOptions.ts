@@ -8,12 +8,12 @@ import useCacheLocation from './useCacheLocation';
 
 const CACHE_SIZES = [0, 2147483648, 5368709120, 10737418240, null];
 
-const cacheSizeToString = (size: number | null) => {
+const cacheSizeToString = (size: number | null, t: (key: string) => string) => {
     return size === null ?
-        'Infinite'
+        t('SETTINGS_CACHE_UNLIMITED')
         :
         size === 0 ?
-            'No caching'
+            t('SETTINGS_CACHE_NONE')
             :
             `${Math.ceil(((size / 1024 / 1024 / 1024) + Number.EPSILON) * 100) / 100}GiB`;
 };
@@ -117,7 +117,7 @@ const useStreamingOptions = (streamingServer: StreamingServer) => {
                 });
             }
         };
-    }, [settings, networkInfo]);
+    }, [settings, networkInfo, t, core.transport]);
 
     const cacheSizeSelect = useMemo(() => {
         if (!settings) {
@@ -126,12 +126,12 @@ const useStreamingOptions = (streamingServer: StreamingServer) => {
 
         return {
             options: CACHE_SIZES.map((size) => ({
-                label: cacheSizeToString(size),
+                label: cacheSizeToString(size, t),
                 value: JSON.stringify(size)
             })),
             value: JSON.stringify(settings.cacheSize),
             title: () => {
-                return cacheSizeToString(settings.cacheSize);
+                return cacheSizeToString(settings.cacheSize, t);
             },
             onSelect: (value: any) => {
                 core.transport.dispatch({
@@ -146,7 +146,7 @@ const useStreamingOptions = (streamingServer: StreamingServer) => {
                 });
             }
         };
-    }, [settings]);
+    }, [settings, t, core.transport]);
 
     const torrentProfileSelect = useMemo(() => {
         if (!settings) {
@@ -173,7 +173,7 @@ const useStreamingOptions = (streamingServer: StreamingServer) => {
                 .concat(
                     isCustomTorrentProfileSelected ?
                         [{
-                            label: 'custom',
+                            label: t('SETTINGS_CUSTOM'),
                             value: JSON.stringify(selectedTorrentProfile)
                         }]
                         :
@@ -193,7 +193,7 @@ const useStreamingOptions = (streamingServer: StreamingServer) => {
                 });
             }
         };
-    }, [settings]);
+    }, [settings, t, core.transport]);
 
     const transcodingProfileSelect = useMemo(() => {
         if (!settings || !deviceInfo) {
@@ -225,7 +225,7 @@ const useStreamingOptions = (streamingServer: StreamingServer) => {
                 });
             }
         };
-    }, [settings, deviceInfo]);
+    }, [settings, deviceInfo, t, core.transport]);
 
     return {
         streamingServerRemoteUrlInput,

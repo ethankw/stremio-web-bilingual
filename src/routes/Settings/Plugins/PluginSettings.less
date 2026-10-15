@@ -1,0 +1,22 @@
+.hint { color: rgba(255, 255, 255, .65); line-height: 1.6; margin-bottom: 1rem; }
+.list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; }
+.card { background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1); border-radius: .85rem; padding: 1.25rem; min-width: 0; }
+.card p { color: rgba(255, 255, 255, .65); font-size: .9rem; line-height: 1.65; overflow-wrap: anywhere; }
+.heading { display: flex; gap: .75rem; align-items: baseline; flex-wrap: wrap; }
+.heading h3 { font-size: 1.1rem; font-weight: 500; overflow-wrap: anywhere; }
+.heading span { color: rgba(255, 255, 255, .6); font-size: .8rem; }
+.actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .85rem; }
+.actions > *, .editor button { background: rgba(255, 255, 255, .1); border: 0; border-radius: .5rem; color: white; padding: .65rem .9rem; min-height: 2.75rem; font: inherit; font-size: .9rem; cursor: pointer; }
+.actions button[aria-pressed='true'] { background: #7652ed; }
+.actions button:disabled { opacity: .45; cursor: default; }
+.actions > *:focus-visible, .editor button:focus-visible, .field input:focus-visible, .field select:focus-visible { outline: 2px solid #bba3ff; outline-offset: 3px; }
+.editor { margin-top: 1.5rem; padding-top: .5rem; border-top: 1px solid rgba(255, 255, 255, .1); }
+.field { display: flex; flex-direction: column; gap: .5rem; margin-block: 1rem; }
+.field input, .field select { min-width: 0; width: 100%; background: #262338; border: 1px solid rgba(255, 255, 255, .2); border-radius: .5rem; color: white; padding: .65rem; font: inherit; }
+
+.choices { min-inline-size: 0; border: 0; padding: 0; margin-block: 1.25rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+.choices legend { margin-bottom: .75rem; }
+.choices label { display: flex; align-items: center; gap: .45rem; padding: .6rem .75rem; min-height: 2.75rem; border: 1px solid rgba(255, 255, 255, .2); border-radius: 2rem; cursor: pointer; }
+.choices label:has(input:checked) { background: rgba(118, 82, 237, .3); border-color: #a189ff; }
+.choices input { accent-color: #a189ff; }
+.choices label:focus-within { outline: 2px solid #bba3ff; outline-offset: 2px; }

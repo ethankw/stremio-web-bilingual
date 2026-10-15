@@ -1,0 +1,61 @@
+// Presentation metadata only. Existing hooks remain the source of saved values.
+const entries = [
+    ['SETTINGS_ACCOUNT', 'common', 'account', 'account', 'account login 账号 登录'],
+    ['SETTINGS_ACCOUNT_SECURITY', 'account', 'account-security', 'account-security', 'password export delete 密码 导出 删除'],
+    ['SETTINGS_DATA_EXPORT', 'account', 'account-security'],
+    ['SETTINGS_CHANGE_PASSWORD', 'account', 'account-security'],
+    ['SETTINGS_ACC_DELETE', 'account', 'account-security'],
+    ['SETTINGS_TRAKT', 'common', 'account', 'account', 'Trakt sync 观看记录 同步'],
+    ['SETTINGS_SUBSCRIBE_CALENDAR', 'advanced', 'connections'],
+    ['SETTINGS_DISCORD', 'advanced', 'connections'],
+    ['BILINGUAL_ENABLED', 'common', 'interface'],
+    ['BILINGUAL_TITLE_ORDER', 'common', 'interface'],
+    ['BILINGUAL_OVERVIEW_ORDER', 'common', 'interface'],
+    ['BILINGUAL_CACHE', 'advanced', 'interface', 'interface', 'cache clear 缓存 清除'],
+    ['SETTINGS_UI_LANGUAGE', 'common', 'interface'],
+    ['SETTINGS_UI_ZOOM', 'common', 'interface'],
+    ['SETTINGS_QUIT_ON_CLOSE', 'common', 'interface'],
+    ['SETTINGS_FULLSCREEN_EXIT', 'advanced', 'interface'],
+    ['SETTINGS_BLUR_UNWATCHED_IMAGE', 'common', 'interface', 'interface', 'spoiler 防剧透'],
+    ['SETTINGS_GAMEPAD', 'advanced', 'interface'],
+    ['SETTINGS_SUBTITLES_LANGUAGE', 'common', 'subtitles', 'player'],
+    ['SETTINGS_SUBTITLES_SIZE', 'common', 'subtitles', 'player'],
+    ['SETTINGS_SUBTITLES_COLOR', 'advanced', 'subtitles', 'player'],
+    ['SETTINGS_SUBTITLES_COLOR_BACKGROUND', 'advanced', 'subtitles', 'player'],
+    ['SETTINGS_SUBTITLES_COLOR_OUTLINE', 'advanced', 'subtitles', 'player'],
+    ['SETTINGS_ASS_SUBTITLES_STYLING', 'advanced', 'subtitles', 'player'],
+    ['SETTINGS_DEFAULT_AUDIO_TRACK', 'common', 'audio', 'player'],
+    ['SETTINGS_SURROUND_SOUND', 'advanced', 'audio', 'player'],
+    ['SETTINGS_SEEK_KEY', 'advanced', 'controls', 'player'],
+    ['SETTINGS_SEEK_KEY_SHIFT', 'advanced', 'controls', 'player'],
+    ['AUTO_PLAY', 'common', 'autoplay', 'player'],
+    ['SETTINGS_NEXT_VIDEO_POPUP_DURATION', 'advanced', 'autoplay', 'player'],
+    ['SETTINGS_PLAY_IN_EXTERNAL_PLAYER', 'common', 'playback', 'player'],
+    ['SETTINGS_HWDEC', 'advanced', 'playback', 'player'],
+    ['SETTINGS_GPU_VIDEO_PROCESSING', 'advanced', 'playback', 'player'],
+    ['SETTINGS_VIDEO_MODE', 'advanced', 'playback', 'player'],
+    ['SETTINGS_PAUSE_MINIMIZED', 'common', 'playback', 'player'],
+    ['SETTINGS_SERVICE_STATUS', 'common', 'service'],
+    ['SETTINGS_SERVER_ADD_URL', 'advanced', 'streaming'],
+    ['SETTINGS_REMOTE_URL', 'advanced', 'streaming'],
+    ['SETTINGS_HTTPS_ENDPOINT', 'advanced', 'streaming'],
+    ['SETTINGS_SERVER_CACHE_SIZE', 'advanced', 'streaming'],
+    ['SETTINGS_CACHING_DRIVE', 'advanced', 'streaming'],
+    ['SETTINGS_SERVER_TORRENT_PROFILE', 'advanced', 'streaming'],
+    ['SETTINGS_TRANSCODE_PROFILE', 'advanced', 'streaming'],
+    ['SETTINGS_MY_ADDONS', 'common', 'plugins', 'plugins', 'addons plugins 插件 扩展'],
+    ['SETTINGS_SUPPORT', 'about', 'about'],
+    ['SETTINGS_SOURCE_CODE', 'about', 'about'],
+    ['TERMS_OF_SERVICE', 'about', 'about'],
+    ['PRIVACY_POLICY', 'about', 'about'],
+    ['BILINGUAL_ABOUT', 'about', 'credits', 'about', 'version license TMDB 版本 许可 致谢'],
+    ['SETTINGS_NAV_SHORTCUTS', 'shortcuts', 'shortcuts'],
+];
+const SETTINGS_CATALOG = entries.map(([id, level, group, section = group, keywords = '']) => ({ id, level, group, section, keywords }));
+const matchesSetting = (entry, level, query, translate = (key) => key) => {
+    const words = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return entry.level === level;
+    const text = `${translate(entry.id)} ${entry.keywords} ${entry.id}`.toLocaleLowerCase();
+    return words.every((word) => text.includes(word));
+};
+module.exports = { SETTINGS_CATALOG, matchesSetting };

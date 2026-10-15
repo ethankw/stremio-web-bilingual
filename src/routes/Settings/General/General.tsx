@@ -4,15 +4,17 @@ import { useCore } from 'stremio/core';
 import { Button, Toggle } from 'stremio/components';
 import { usePlatform, useToast, useDiscord } from 'stremio/common';
 import { Section, Option, Link } from '../components';
+import { Setting } from '../Presentation';
 import User from './User';
 import useDataExport from './useDataExport';
 import styles from './General.less';
 
 type Props = {
     profile: Profile,
+    onAccount: () => void,
 };
 
-const General = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
+const General = forwardRef<HTMLDivElement, Props>(({ profile, onAccount }: Props, ref) => {
     const { t } = useTranslation();
     const core = useCore();
     const platform = usePlatform();
@@ -97,82 +99,40 @@ const General = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
     }, [isTraktAuthenticated, traktAuthStarted]);
 
     return <>
-        <Section ref={ref}>
-            <User profile={profile} />
-        </Section>
-
-        <Section>
-            {
-                profile?.auth?.user &&
-                    <Link
-                        label={t('SETTINGS_DATA_EXPORT')}
-                        onClick={onExportData}
-                    />
-            }
-            {
-                profile?.auth?.user &&
-                    <Link
-                        label={t('SETTINGS_SUBSCRIBE_CALENDAR')}
-                        onClick={onCalendarSubscribe}
-                    />
-            }
-            <Link
-                label={t('SETTINGS_SUPPORT')}
-                href={'https://stremio.zendesk.com/hc/en-us'}
-            />
-            <Link
-                label={t('SETTINGS_SOURCE_CODE')}
-                href={`https://github.com/ethankw/stremio-web-bilingual/tree/${process.env.COMMIT_HASH}`}
-            />
-            <Link
-                label={t('TERMS_OF_SERVICE')}
-                href={'https://www.stremio.com/tos'}
-            />
-            <Link
-                label={t('PRIVACY_POLICY')}
-                href={'https://www.stremio.com/privacy'}
-            />
-            {
-                profile?.auth?.user &&
-                    <Link
-                        label={t('SETTINGS_ACC_DELETE')}
-                        href={'https://stremio.zendesk.com/hc/en-us/articles/360021428911-How-to-delete-my-account'}
-                    />
-            }
-            {
-                profile?.auth?.user?.email &&
-                    <Link
-                        label={t('SETTINGS_CHANGE_PASSWORD')}
-                        href={`https://www.strem.io/reset-password/${profile.auth.user.email}`}
-                    />
-            }
-            <Option className={styles['trakt-container']} icon={'trakt'} label={t('SETTINGS_TRAKT')}>
-                <Button className={'button'} title={isTraktAuthenticated ? t('LOG_OUT') : t('SETTINGS_TRAKT_AUTHENTICATE')} disabled={profile.auth === null} tabIndex={-1} onClick={onToggleTrakt}>
+        <Section ref={ref} settingGroup={'account'} label={'SETTINGS_ACCOUNT'}>
+            <Setting id={'SETTINGS_ACCOUNT'}><User profile={profile} /></Setting>
+            <Setting id={'SETTINGS_ACCOUNT'}><Button className={styles['account-action']} onClick={onAccount}>{t('SETTINGS_ACCOUNT_SECURITY')}</Button></Setting>
+            <Option className={styles['trakt-container']} icon={'trakt'} label={'SETTINGS_TRAKT'}>
+                <Button className={'button'} title={isTraktAuthenticated ? t('LOG_OUT') : t('SETTINGS_TRAKT_AUTHENTICATE')} disabled={profile.auth === null} onClick={onToggleTrakt}>
                     {isTraktAuthenticated ? t('LOG_OUT') : t('SETTINGS_TRAKT_AUTHENTICATE')}
                 </Button>
             </Option>
-            {
-                discord.available &&
-                    <Option className={styles['discord-container']} icon={'discord'} label={'SETTINGS_DISCORD'}>
-                        <Toggle
-                            tabIndex={-1}
-                            {...discordToggle}
-                        />
-                    </Option>
-            }
         </Section>
-        <Section label={t('BILINGUAL_ABOUT', { defaultValue: 'About / Credits' })}>
-            <div className={styles['credits']}>
-                <p>{t('BILINGUAL_FORK_NOTICE', { defaultValue: 'Stremio Web Bilingual is a personal fork of Stremio Web, not an official Stremio release.' })}</p>
-                <p>{t('BILINGUAL_SOURCE_LICENSE', { defaultValue: 'Based on Stremio Web {{version}}. Source modifications remain available under GPL-2.0.', version: process.env.VERSION })}</p>
-                <p>{t('BILINGUAL_BUILD', { defaultValue: 'Build: {{sha}}', sha: process.env.COMMIT_HASH })}</p>
-                <a href={'https://www.themoviedb.org'} target={'_blank'} rel={'noopener noreferrer'}>
-                    <img className={styles['tmdb-logo']} src={'images/tmdb-logo.svg'} alt={'The Movie Database (TMDB)'} />
-                </a>
-                <p>{t('BILINGUAL_TMDB_NOTICE', { defaultValue: 'This product uses the TMDB API but is not endorsed or certified by TMDB.' })}</p>
-            </div>
+        <Section settingGroup={'account-security'} label={'SETTINGS_ACCOUNT_SECURITY'}>
+            <Setting id={'SETTINGS_ACCOUNT_SECURITY'}><p>{t(profile.auth ? 'SETTINGS_ACCOUNT_SECURITY_HINT' : 'SETTINGS_ACCOUNT_LOGIN_HINT')}</p>{!profile.auth && <Link label={t('LOG_IN')} href={'#/intro'} target={'_self'} />}</Setting>
+            {profile?.auth?.user && <Link settingId={'SETTINGS_DATA_EXPORT'} label={t('SETTINGS_DATA_EXPORT')} onClick={onExportData} />}
+            {profile?.auth?.user?.email && <Link settingId={'SETTINGS_CHANGE_PASSWORD'} label={t('SETTINGS_CHANGE_PASSWORD')} href={`https://www.strem.io/reset-password/${encodeURIComponent(profile.auth.user.email)}`} />}
+            {profile?.auth?.user && <Link settingId={'SETTINGS_ACC_DELETE'} label={t('SETTINGS_ACC_DELETE')} href={'https://stremio.zendesk.com/hc/en-us/articles/360021428911-How-to-delete-my-account'} />}
+        </Section>
+        <Section settingGroup={'connections'} label={'SETTINGS_CONNECTIONS'}>
+            {profile?.auth?.user && <Link settingId={'SETTINGS_SUBSCRIBE_CALENDAR'} label={t('SETTINGS_SUBSCRIBE_CALENDAR')} onClick={onCalendarSubscribe} />}
+            {discord.available && <Option className={styles['discord-container']} icon={'discord'} label={'SETTINGS_DISCORD'}><Toggle {...discordToggle} /></Option>}
+        </Section>
+        <Section settingGroup={'about'} label={'BILINGUAL_ABOUT'}>
+            <Link settingId={'SETTINGS_SUPPORT'} label={t('SETTINGS_SUPPORT')} href={'https://stremio.zendesk.com/hc/en-us'} />
+            <Link settingId={'SETTINGS_SOURCE_CODE'} label={t('SETTINGS_SOURCE_CODE')} href={`https://github.com/ethankw/stremio-web-bilingual/tree/${process.env.COMMIT_HASH}`} />
+            <Link settingId={'TERMS_OF_SERVICE'} label={t('TERMS_OF_SERVICE')} href={'https://www.stremio.com/tos'} />
+            <Link settingId={'PRIVACY_POLICY'} label={t('PRIVACY_POLICY')} href={'https://www.stremio.com/privacy'} />
+            <Setting id={'BILINGUAL_ABOUT'}><div className={styles['credits']}>
+                <p>{t('BILINGUAL_FORK_NOTICE')}</p>
+                <p>{t('BILINGUAL_SOURCE_LICENSE', { version: process.env.VERSION })}</p>
+                <p>{t('BILINGUAL_BUILD', { sha: process.env.COMMIT_HASH })}</p>
+                <a href={'https://www.themoviedb.org'} target={'_blank'} rel={'noopener noreferrer'}><img className={styles['tmdb-logo']} src={'images/tmdb-logo.svg'} alt={'The Movie Database (TMDB)'} /></a>
+                <p>{t('BILINGUAL_TMDB_NOTICE')}</p>
+            </div></Setting>
         </Section>
     </>;
+
 });
 
 export default General;

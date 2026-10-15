@@ -26,7 +26,6 @@ const Player = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
         playInExternalPlayerSelect,
         nextVideoPopupDurationSelect,
         bingeWatchingToggle,
-        playInBackgroundToggle,
         hardwareDecodingToggle,
         gpuVideoProcessingToggle,
         videoModeSelect,
@@ -34,8 +33,8 @@ const Player = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
     } = usePlayerOptions(profile);
 
     return (
-        <Section ref={ref} label={'SETTINGS_NAV_PLAYER'}>
-            <Category icon={'subtitles'} label={'SETTINGS_SECTION_SUBTITLES'}>
+        <Section settingGroup={'player'} ref={ref} label={'SETTINGS_NAV_PLAYER'}>
+            <Category icon={'subtitles'} label={'SETTINGS_SECTION_SUBTITLES'} settingGroup={'subtitles'}>
                 <Option label={'SETTINGS_SUBTITLES_LANGUAGE'}>
                     <MultiselectMenu
                         className={'multiselect'}
@@ -68,12 +67,12 @@ const Player = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
                 </Option>
                 <Option label={'SETTINGS_ASS_SUBTITLES_STYLING'}>
                     <Toggle
-                        tabIndex={-1}
+                        tabIndex={0}
                         {...assSubtitlesStylingToggle}
                     />
                 </Option>
             </Category>
-            <Category icon={'volume-medium'} label={'SETTINGS_SECTION_AUDIO'}>
+            <Category icon={'volume-medium'} label={'SETTINGS_SECTION_AUDIO'} settingGroup={'audio'}>
                 <Option label={'SETTINGS_DEFAULT_AUDIO_TRACK'}>
                     <MultiselectMenu
                         className={'multiselect'}
@@ -82,12 +81,12 @@ const Player = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
                 </Option>
                 <Option label={'SETTINGS_SURROUND_SOUND'}>
                     <Toggle
-                        tabIndex={-1}
+                        tabIndex={0}
                         {...surroundSoundToggle}
                     />
                 </Option>
             </Category>
-            <Category icon={'remote'} label={'SETTINGS_SECTION_CONTROLS'}>
+            <Category icon={'remote'} label={'SETTINGS_SECTION_CONTROLS'} settingGroup={'controls'}>
                 <Option label={'SETTINGS_SEEK_KEY'}>
                     <MultiselectMenu
                         className={'multiselect'}
@@ -100,18 +99,11 @@ const Player = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
                         {...seekShortTimeDurationSelect}
                     />
                 </Option>
-                <Option label={'SETTINGS_PLAY_IN_BACKGROUND'}>
-                    <Toggle
-                        disabled={true}
-                        tabIndex={-1}
-                        {...playInBackgroundToggle}
-                    />
-                </Option>
             </Category>
-            <Category icon={'play'} label={'SETTINGS_SECTION_AUTO_PLAY'}>
+            <Category icon={'play'} label={'SETTINGS_SECTION_AUTO_PLAY'} settingGroup={'autoplay'}>
                 <Option label={'AUTO_PLAY'}>
                     <Toggle
-                        tabIndex={-1}
+                        tabIndex={0}
                         {...bingeWatchingToggle}
                     />
                 </Option>
@@ -122,7 +114,7 @@ const Player = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
                     />
                 </Option>
             </Category>
-            <Category icon={'glasses'} label={'SETTINGS_SECTION_ADVANCED'}>
+            <Category icon={'glasses'} label={'SETTINGS_PLAYBACK_COMPATIBILITY'} settingGroup={'playback'}>
                 <Option label={'SETTINGS_PLAY_IN_EXTERNAL_PLAYER'}>
                     <MultiselectMenu
                         className={'multiselect'}
@@ -133,7 +125,7 @@ const Player = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
                     shell.active &&
                         <Option label={'SETTINGS_HWDEC'}>
                             <Toggle
-                                tabIndex={-1}
+                                tabIndex={0}
                                 {...hardwareDecodingToggle}
                             />
                         </Option>
@@ -142,7 +134,7 @@ const Player = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
                     shell.active && shell.capabilities.gpuVideoProcessing &&
                         <Option label={'SETTINGS_GPU_VIDEO_PROCESSING'}>
                             <Toggle
-                                tabIndex={-1}
+                                tabIndex={0}
                                 {...gpuVideoProcessingToggle}
                             />
                         </Option>
@@ -160,7 +152,7 @@ const Player = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
                     shell.active &&
                         <Option label={'SETTINGS_PAUSE_MINIMIZED'}>
                             <Toggle
-                                tabIndex={-1}
+                                tabIndex={0}
                                 {...pauseOnMinimizeToggle}
                             />
                         </Option>
