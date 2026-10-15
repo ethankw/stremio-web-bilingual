@@ -18,6 +18,7 @@ const routesRegexp = require('stremio/common/routesRegexp');
 const useBinaryState = require('stremio/common/useBinaryState');
 const ActionButton = require('./ActionButton');
 const MetaLinks = require('./MetaLinks');
+const usePeople = require('./MetaLinks/usePeople');
 const MetaPreviewPlaceholder = require('./MetaPreviewPlaceholder');
 const styles = require('./styles');
 const { Ratings } = require('./Ratings');
@@ -35,6 +36,7 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
     const { t } = useTranslation();
     const bilingual = useBilingualMetadata(bilingualIdentity, { priority: 0 });
     const episodeBilingual = useBilingualMetadata(bilingualEpisode, { priority: 0 });
+    const people = usePeople(bilingualIdentity, bilingual.enabled && bilingual.metadata?.matchStatus === 'matched');
     const displayBilingual = bilingualEpisode ? episodeBilingual : bilingual;
     const [shareModalOpen, openShareModal, closeShareModal] = useBinaryState(false);
     const isMobileLandscape = useMediaQuery(`(max-width: ${screenSizes.xsmall}) and (max-height: ${screenSizes['phone-landscape-size']}) and (orientation: landscape)`);
@@ -212,6 +214,7 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                                 className={styles['meta-links']}
                                 label={category}
                                 links={linksGroups.get(category)}
+                                people={people}
                             />
                         ))
                 }

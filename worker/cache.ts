@@ -11,7 +11,7 @@ type CacheEntry = {
     expiresAt: number;
 };
 
-export class MetadataCache {
+export class MetadataCache<T extends { matchStatus: string } = BilingualMetadata> {
     private readonly entries = new Map<string, CacheEntry>();
     private totalBytes = 0;
 
@@ -37,7 +37,7 @@ export class MetadataCache {
         return entry.body;
     }
 
-    public set(key: string, metadata: BilingualMetadata): void {
+    public set(key: string, metadata: T): void {
         if (metadata.matchStatus !== 'matched' && metadata.matchStatus !== 'unmatched') {
             return;
         }

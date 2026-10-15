@@ -1,7 +1,8 @@
 import { MetadataCache } from './cache';
-import { DEFAULT_REQUEST_BUDGET_MS, MAX_TMDB_RESPONSE_BYTES, TmdbFailure, resolveMetadata } from './tmdb';
+import { DEFAULT_REQUEST_BUDGET_MS, MAX_TMDB_RESPONSE_BYTES, TmdbFailure, resolveMetadata, resolvePeople } from './tmdb';
 import type {
     FetchFunction,
+    PeopleMetadata,
     MetadataIdentity,
     WorkerDependencies,
     WorkerEnv,
@@ -27,6 +28,7 @@ const QUERY_VALUE_LIMITS: Record<string, number> = {
 
 const KNOWN_API_ROUTES = new Set([
     '/api/health',
+    '/api/bilingual/v1/people',
     '/api/bilingual/v1/meta',
     '/api/bilingual/v1/episode',
 ]);
@@ -189,6 +191,8 @@ const handleMetadata = async (
     cache: MetadataCache,
     now: () => number,
     dependencies: WorkerDependencies,
+    people = false,
+    peopleCache?: MetadataCache<PeopleMetadata>,
 ): Promise<Response> => {
     if (env.BILINGUAL_METADATA_ENABLED !== 'true') {
         return errorResponse(503, 'METADATA_DISABLED', 'Bilingual metadata is disabled.');
@@ -200,13 +204,13 @@ const handleMetadata = async (
     }
 
     const key = cacheKey(identity);
-    const cached = cache.get(key);
+    const cached = people ? peopleCache?.get(key) ?? null : cache.get(key);
     if (cached !== null) {
         return responseFromSerializedJson(cached);
     }
 
     try {
-        const metadata = await resolveMetadata(identity, token, {
+        const resolverDependencies = {
             fetch: upstreamFetch,
             now,
             requestBudgetMs: dependencies.requestBudgetMs || DEFAULT_REQUEST_BUDGET_MS,
@@ -214,7 +218,13 @@ const handleMetadata = async (
             sleep: dependencies.sleep,
             setTimeout: dependencies.setTimeout,
             clearTimeout: dependencies.clearTimeout,
-        });
+        };
+        if (people && peopleCache) {
+            const credits = await resolvePeople(identity, token, resolverDependencies);
+            peopleCache.set(key, credits);
+            return responseFromJson(credits);
+        }
+        const metadata = await resolveMetadata(identity, token, resolverDependencies);
         cache.set(key, metadata);
         return responseFromJson(metadata);
     } catch (error) {
@@ -230,6 +240,7 @@ export const createWorker = (dependencies: WorkerDependencies = {}): WorkerHandl
     const upstreamFetch: FetchFunction = dependencies.fetch || globalThis.fetch.bind(globalThis);
     const now = asClockNumber(dependencies.clock);
     const cache = new MetadataCache(now);
+    const peopleCache = new MetadataCache<PeopleMetadata>(now, 64, 128 * 1024);
 
     const handler: WorkerFetch = async (request, env) => {
         const url = new URL(request.url);
@@ -246,7 +257,7 @@ export const createWorker = (dependencies: WorkerDependencies = {}): WorkerHandl
             return healthResponse(url, env);
         }
 
-        if (url.pathname !== '/api/bilingual/v1/meta' && url.pathname !== '/api/bilingual/v1/episode') {
+        if (url.pathname !== '/api/bilingual/v1/meta' && url.pathname !== '/api/bilingual/v1/episode' && url.pathname !== '/api/bilingual/v1/people') {
             return errorResponse(404, 'NOT_FOUND', 'Not found.');
         }
 
@@ -256,7 +267,7 @@ export const createWorker = (dependencies: WorkerDependencies = {}): WorkerHandl
             return errorResponse(400, 'INVALID_REQUEST', 'Invalid request.');
         }
 
-        return handleMetadata(env, identity, upstreamFetch, cache, now, dependencies);
+        return handleMetadata(env, identity, upstreamFetch, cache, now, dependencies, url.pathname.endsWith('/people'), peopleCache);
     };
 
     return Object.assign(handler, { fetch: handler });

@@ -75,6 +75,8 @@
         flex: 1;
         align-self: stretch;
         overflow-y: auto;
+        min-width: 0;
+        max-inline-size: 40rem;
 
         .bilingual-title {
             margin-bottom: 1rem;
@@ -155,6 +157,8 @@
 
         .description-container {
             margin-top: 1rem;
+            max-inline-size: 68ch;
+            overflow-wrap: anywhere;
             font-weight: 400;
             line-height: 2em;
             .label-container {

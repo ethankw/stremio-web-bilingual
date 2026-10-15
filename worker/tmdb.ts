@@ -4,6 +4,7 @@ import type {
     LocalizedText,
     MetadataIdentity,
     SupportedType,
+    PeopleMetadata,
 } from './types';
 
 export const TMDB_ORIGIN = 'https://api.themoviedb.org';
@@ -531,21 +532,7 @@ export const resolveMetadata = async (
         clearTimeout?: typeof globalThis.clearTimeout;
     },
 ): Promise<BilingualMetadata> => {
-    const requestBudgetMs = Number.isFinite(dependencies.requestBudgetMs) && (dependencies.requestBudgetMs as number) > 0 ? Math.min(MAX_REQUEST_BUDGET_MS, dependencies.requestBudgetMs as number) : DEFAULT_REQUEST_BUDGET_MS;
-    const maxResponseBytes = Number.isSafeInteger(dependencies.maxResponseBytes) && (dependencies.maxResponseBytes as number) > 0 ? Math.min(MAX_TMDB_RESPONSE_BYTES, dependencies.maxResponseBytes as number) : MAX_TMDB_RESPONSE_BYTES;
-    const setTimer = dependencies.setTimeout || globalThis.setTimeout.bind(globalThis);
-    const clearTimer = dependencies.clearTimeout || globalThis.clearTimeout.bind(globalThis);
-    const sleep = dependencies.sleep || ((milliseconds: number) => new Promise<void>((resolve) => setTimer(resolve, milliseconds)));
-    const options: TmdbOptions = {
-        fetch: dependencies.fetch,
-        token,
-        maxResponseBytes,
-        sleep,
-        setTimeout: setTimer,
-        clearTimeout: clearTimer,
-        now: dependencies.now,
-    };
-    const deadline = Date.now() + requestBudgetMs;
+    const { options, deadline } = requestOptions(token, dependencies);
     let findPayload: unknown;
     try {
         findPayload = await requestJson(findUrl(identity.id), options, deadline);
@@ -571,4 +558,64 @@ export const resolveMetadata = async (
     }
 
     return resolveMovieOrSeries(identity, candidates[0], options, deadline);
+};
+
+type TmdbDependencies = Parameters<typeof resolveMetadata>[2];
+const requestOptions = (token: string, dependencies: TmdbDependencies): { options: TmdbOptions; deadline: number } => {
+    const requestBudgetMs = Number.isFinite(dependencies.requestBudgetMs) && (dependencies.requestBudgetMs as number) > 0 ? Math.min(MAX_REQUEST_BUDGET_MS, dependencies.requestBudgetMs as number) : DEFAULT_REQUEST_BUDGET_MS;
+    const maxResponseBytes = Number.isSafeInteger(dependencies.maxResponseBytes) && (dependencies.maxResponseBytes as number) > 0 ? Math.min(MAX_TMDB_RESPONSE_BYTES, dependencies.maxResponseBytes as number) : MAX_TMDB_RESPONSE_BYTES;
+    const setTimer = dependencies.setTimeout || globalThis.setTimeout.bind(globalThis);
+    const clearTimer = dependencies.clearTimeout || globalThis.clearTimeout.bind(globalThis);
+    const sleep = dependencies.sleep || ((milliseconds: number) => new Promise<void>((resolve) => setTimer(resolve, milliseconds)));
+    const options: TmdbOptions = {
+        fetch: dependencies.fetch,
+        token,
+        maxResponseBytes,
+        sleep,
+        setTimeout: setTimer,
+        clearTimeout: clearTimer,
+        now: dependencies.now,
+    };
+    const deadline = Date.now() + requestBudgetMs;
+    return { options, deadline };
+};
+
+// Resolve within this title's credits only. Never use global person-name search.
+export const resolvePeople = async (identity: MetadataIdentity, token: string, dependencies: TmdbDependencies): Promise<PeopleMetadata> => {
+    const { options, deadline } = requestOptions(token, dependencies);
+    const result: PeopleMetadata = {
+        schemaVersion: 1,
+        identity: { stremioType: identity.type, stremioId: identity.id, tmdbId: null },
+        matchStatus: 'unmatched', source: 'tmdb', people: [],
+    };
+    try {
+        const candidates = candidateId(await requestJson(findUrl(identity.id), options, deadline), identity.type);
+        if (candidates.length !== 1) {
+            result.matchStatus = candidates.length > 1 ? 'ambiguous' : 'unmatched';
+            return result;
+        }
+        const tmdbId = candidates[0];
+        const kind = identity.type === 'movie' ? 'movie' : 'tv';
+        const payload = await requestJson(`${TMDB_API_BASE}/${kind}/${tmdbId}/credits?language=en-US`, options, deadline);
+        if (!isRecord(payload) || payload.id !== tmdbId || !Array.isArray(payload.cast) || !Array.isArray(payload.crew)) {
+            throw new TmdbFailure('bad-response');
+        }
+        result.identity.tmdbId = tmdbId;
+        result.matchStatus = 'matched';
+        const append = (person: unknown, role: 'cast' | 'director') => {
+            if (!isRecord(person) || !isPositiveInteger(person.id)) return;
+            const names = Array.from(new Set([person.name, person.original_name]
+                .filter((name): name is string => typeof name === 'string' && name.trim().length > 0 && name.length <= 200)
+                .map((name) => name.trim())));
+            if (names.length === 0) return;
+            const path = typeof person.profile_path === 'string' && /^\/[a-zA-Z0-9_-]+\.(?:jpg|png|webp)$/.test(person.profile_path) ? person.profile_path : null;
+            result.people.push({ id: person.id, names, role, image: path ? `https://image.tmdb.org/t/p/w45${path}` : null });
+        };
+        payload.cast.slice(0, 100).forEach((person) => append(person, 'cast'));
+        payload.crew.filter((person) => isRecord(person) && person.job === 'Director').slice(0, 20).forEach((person) => append(person, 'director'));
+        return result;
+    } catch (error) {
+        if (error instanceof TmdbFailure && error.kind === 'not-found') return result;
+        throw error;
+    }
 };

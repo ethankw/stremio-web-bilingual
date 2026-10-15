@@ -6,8 +6,21 @@ const classnames = require('classnames');
 const { Button } = require('stremio/components');
 const useTranslate = require('stremio/common/useTranslate');
 const styles = require('./styles');
+const { personImage } = require('./people');
 
-const MetaLinks = ({ className, label, links }) => {
+const PersonAvatar = ({ image }) => {
+    const [failed, setFailed] = React.useState(false);
+    React.useEffect(() => setFailed(false), [image]);
+    return (
+        <span className={styles['person-avatar']} aria-hidden={true}>
+            {image && !failed ? <img src={image} alt="" title="TMDB" loading="lazy" decoding="async" onError={() => setFailed(true)} /> : <svg className={styles['person-placeholder']} viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3z" /></svg>}
+        </span>
+    );
+};
+PersonAvatar.propTypes = { image: PropTypes.string };
+
+const MetaLinks = ({ className, label, links, people }) => {
+    const category = label;
     const { string, stringWithPrefix } = useTranslate();
     return (
         <div className={classnames(className, styles['meta-links-container'])}>
@@ -24,6 +37,7 @@ const MetaLinks = ({ className, label, links }) => {
                     <div className={styles['links-container']}>
                         {links.map(({ label, href }, index) => (
                             <Button key={index} className={styles['link-container']} title={label} href={href}>
+                                {(category === 'Cast' || category === 'Directors') ? <PersonAvatar image={personImage(people, label, category)} /> : null}
                                 { string(label) }
                             </Button>
                         ))}
@@ -38,6 +52,7 @@ const MetaLinks = ({ className, label, links }) => {
 MetaLinks.propTypes = {
     className: PropTypes.string,
     label: PropTypes.string,
+    people: PropTypes.array,
     links: PropTypes.arrayOf(PropTypes.shape({
         label: PropTypes.string,
         href: PropTypes.string
