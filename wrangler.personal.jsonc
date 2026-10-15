@@ -1,6 +1,6 @@
 {
     "$schema": "node_modules/wrangler/config-schema.json",
-    "name": "stremio-bilingual-personal",
+    "name": "stremio2",
     "account_id": "c7172cb0425bd8e96799aa3d2764e3a7",
     "main": "worker/index.ts",
     "compatibility_date": "2026-10-14",

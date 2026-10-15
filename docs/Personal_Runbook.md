@@ -26,6 +26,8 @@ npx --yes pnpm@11.8.0 dev:personal
 
 ## 私人 HTTPS 入口
 
+唯一使用入口固定为 **https://stremio2.ethankw.workers.dev/**。所有日常修改都在这个地址发布并验收，不再让用户切换到本地或 preview。参见 [固定入口规范](Delivery_Entry.md)。新地址可能需要用户自行登录一次原有 Stremio 账号，不要重装插件或复制登录令牌。
+
 正式使用前先完成该项目的 Cloudflare Access 登录，再通过原 Stremio 页面登录账号。这两层登录独立。访问地址、发布提交和 Worker 版本以实际发布收据为准。
 
 Access 失效时，资料层退回并提示重新进入私人入口。服务关闭或故障也会撤销已显示的旧结果；启动、恢复前台和前台每 30 秒会检查状态。页面、片源和原业务动作仍可使用。
@@ -40,7 +42,7 @@ Access 失效时，资料层退回并提示重新进入私人入口。服务关�
 
 ## 发布与回滚
 
-发布仅操作 `stremio-bilingual-preview` 和 `stremio-bilingual-personal`。从干净、已提交且通过 CI 的候选构建，部署时记录完整 SHA 与 Worker 版本；先关闭且无凭证部署，单 Worker Access 保护和匿名阻止验证后才设置 Secret、提交启用配置并重新构建部署。
+正式发布目标为 `stremio2`，配置为 `wrangler.personal.jsonc`。preview 仅用于内部验证；旧 personal 入口保留作历史，不再要求用户前往。不得为切换入口删除旧 Worker 或改动其他项目。从干净、已提交且通过 CI 的候选构建，部署时记录完整 SHA 与 Worker 版本；先关闭且无凭证部署，单 Worker Access 保护和匿名阻止验证后才设置 Secret、提交启用配置并重新构建部署。
 
 继承的官方 Pages/Release/清理发布任务在本 Fork 中不执行。个人 CI 只做检查和部署 dry-run，没有自动云端发布或凭证。
 

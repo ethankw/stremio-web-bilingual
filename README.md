@@ -3,7 +3,7 @@
 基于官方 `v5.0.0-beta.42`，保留原 Stremio 核心与播放机制，在显示层补充有 TMDB 语言证据的中英文资料。此仓库不是官方发布；修改保持 GPL-2.0，TMDB 署名见应用 About/Credits。
 
 - 本地开发：`npx --yes pnpm@11.8.0 install --frozen-lockfile`，安全配置本项目 `.dev.vars` 后运行 `npx --yes pnpm@11.8.0 dev:personal`，访问 `http://localhost:18433/`。
-- 私人入口：`https://stremio-bilingual-personal.ethankw.workers.dev/`；预览：`https://stremio-bilingual-preview.ethankw.workers.dev/`。先 Access 登录，再登录自己的 Stremio 账号。各入口的实际发布状态以部署收据为准。
+- 唯一使用入口：**https://stremio2.ethankw.workers.dev/**。后续更新固定在此交付；内部测试入口不再用于用户验收。先 Access 登录，再登录原有 Stremio 账号。[固定入口规范](docs/Delivery_Entry.md)。实际发布状态以部署收据为准。
 - 开发验证：`npx --yes pnpm@11.8.0 verify:personal`。
 - [使用、维护和回滚](docs/Personal_Runbook.md)、[验收记录](docs/Acceptance.md)、[执行规范及阶段收据](docs/Stremio_Bilingual_Codex_Plan_0001.md)。
 
