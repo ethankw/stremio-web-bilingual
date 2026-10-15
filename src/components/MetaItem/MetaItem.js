@@ -19,6 +19,7 @@ const styles = require('./styles');
 const { useBilingualMetadata, getBilingualTitleText } = require('stremio/common/bilingual');
 const { BilingualTitle } = require('stremio/components/BilingualMetadata');
 
+const { canonicalArtwork } = require('stremio/common/bilingual/presentation');
 const getCardMetadata = require('./getCardMetadata');
 
 const MetaItem = React.memo(({ className, type, releaseInfo, released, links, imdbRating, name, poster, posterShape, posterChangeCursor, progress, newVideos, options, actionMenu, deepLinks, href: customHref, dataset, optionOnSelect, onDismissClick, onPlayClick, watched, live, bilingualIdentity, ...props }) => {
@@ -107,7 +108,7 @@ const MetaItem = React.memo(({ className, type, releaseInfo, released, links, im
                     <div className={styles['poster-image-layer']}>
                         <Image
                             className={styles['poster-image']}
-                            src={artwork.src}
+                            src={canonicalArtwork(bilingual.metadata, 'poster', artwork.src, bilingual.enabled)}
                             alt={' '}
                             renderFallback={renderPosterFallback}
                         />

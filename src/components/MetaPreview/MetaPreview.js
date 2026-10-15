@@ -18,6 +18,8 @@ const routesRegexp = require('stremio/common/routesRegexp');
 const useBinaryState = require('stremio/common/useBinaryState');
 const ActionButton = require('./ActionButton');
 const MetaLinks = require('./MetaLinks');
+const { canonicalArtwork } = require('stremio/common/bilingual/presentation');
+const { canonicalCreditGroups } = require('./MetaLinks/people');
 const usePeople = require('./MetaLinks/usePeople');
 const MetaPreviewPlaceholder = require('./MetaPreviewPlaceholder');
 const styles = require('./styles');
@@ -41,7 +43,7 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
     const [shareModalOpen, openShareModal, closeShareModal] = useBinaryState(false);
     const isMobileLandscape = useMediaQuery(`(max-width: ${screenSizes.xsmall}) and (max-height: ${screenSizes['phone-landscape-size']}) and (orientation: landscape)`);
     const iconActions = compact && isMobileLandscape;
-    const linksGroups = React.useMemo(() => {
+    const originalLinksGroups = React.useMemo(() => {
         return Array.isArray(links) ?
             links
                 .filter((link) => link && typeof link.category === 'string' && typeof link.url === 'string')
@@ -86,6 +88,9 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
             :
             new Map();
     }, [links]);
+    const linksGroups = React.useMemo(() => canonicalCreditGroups(originalLinksGroups, people, bilingual.enabled), [originalLinksGroups, people, bilingual.enabled]);
+    const displayLogo = canonicalArtwork(bilingual.metadata, 'logo', logo, bilingual.enabled);
+    const displayBackground = canonicalArtwork(bilingual.metadata, 'background', background, bilingual.enabled);
     const showHref = React.useMemo(() => {
         return deepLinks ?
             typeof deepLinks.player === 'string' ?
@@ -126,19 +131,19 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
     return (
         <div className={classnames(className, styles['meta-preview-container'], { [styles['compact']]: compact })} ref={ref}>
             {
-                typeof background === 'string' && background.length > 0 ?
+                typeof displayBackground === 'string' && displayBackground.length > 0 ?
                     <div className={styles['background-image-layer']}>
-                        <Image className={styles['background-image']} src={background} alt={' '} />
+                        <Image className={styles['background-image']} src={displayBackground} alt={' '} />
                     </div>
                     :
                     null
             }
             <div className={styles['meta-info-container']}>
                 {
-                    typeof logo === 'string' && logo.length > 0 ?
+                    typeof displayLogo === 'string' && displayLogo.length > 0 ?
                         <Image
                             className={styles['logo']}
-                            src={logo}
+                            src={displayLogo}
                             alt={' '}
                             title={name}
                             renderFallback={renderLogoFallback}

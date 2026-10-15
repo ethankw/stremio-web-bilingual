@@ -5,6 +5,7 @@ import classNames from 'classnames';
 import Icon from '@stremio/stremio-icons/react';
 import { Button, Image } from 'stremio/components';
 import styles from './Episode.less';
+const CanonicalPoster = require('stremio/components/CanonicalPoster/CanonicalPoster');
 
 type Props = CalendarContentItem & {
     hideSpoilers: boolean,
@@ -21,8 +22,8 @@ const Episode = ({ name, title, season, episode, poster, background, thumbnail, 
     }, [onClick, deepLinks.metaDetailsStreams]);
 
     const renderPoster = useCallback(() => (
-        <Image className={styles['artwork']} src={poster} alt={' '} renderFallback={renderPlaceholder} />
-    ), [poster]);
+        <CanonicalPoster detailHref={deepLinks.metaDetailsStreams} className={styles['artwork']} src={poster} alt={' '} renderFallback={renderPlaceholder} />
+    ), [poster, deepLinks.metaDetailsStreams]);
 
     const renderBackground = useCallback(() => (
         <Image className={styles['artwork']} src={background} alt={' '} renderFallback={renderPoster} />

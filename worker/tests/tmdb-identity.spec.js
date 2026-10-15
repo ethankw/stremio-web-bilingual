@@ -18,7 +18,7 @@ test.each(['movie', 'series'])('direct TMDB %s identity reaches bilingual displa
     expect(getBilingualTitleLines(result.metadata, '原始中文名称').map(x => x.text)).toEqual(['English title', '中文标题']);
     expect(result.metadata.overview.en.text).toBe('English overview');
     expect(result.metadata.overview.zh.text).toBe('中文简介');
-    expect(upstream.mock.calls.map(x => x[0])).toEqual([`https://api.themoviedb.org/3/${type === 'movie' ? 'movie' : 'tv'}/603`, `https://api.themoviedb.org/3/${type === 'movie' ? 'movie' : 'tv'}/603/translations`]);
+    expect(upstream.mock.calls.map(x => x[0])).toEqual([`https://api.themoviedb.org/3/${type === 'movie' ? 'movie' : 'tv'}/603?language=en-US&append_to_response=images&include_image_language=en,null`, `https://api.themoviedb.org/3/${type === 'movie' ? 'movie' : 'tv'}/603/translations`]);
     expect(validateMetadata({ ...result.metadata, identity: { ...result.metadata.identity, tmdbId: 999 } }, normalizeIdentity(identity))).toBe(false);
     await client.request(identity);
     expect(upstream).toHaveBeenCalledTimes(2);

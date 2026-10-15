@@ -20,6 +20,9 @@ const styles = require('./styles');
 
 const GAMEPAD_HANDLER_ID = 'metadetails';
 
+const { useBilingualMetadata } = require('stremio/common/bilingual');
+const { canonicalArtwork } = require('stremio/common/bilingual/presentation');
+
 const MetaDetails = () => {
     const { type, id, videoId } = useParams();
     const location = useLocation();
@@ -42,6 +45,7 @@ const MetaDetails = () => {
         return profile.addons.some((addon) => addon.transportUrl === metaAddonUrl && addon.manifest.behaviorHints?.epgProvider === true);
     }, [profile.addons, metaAddonUrl]);
     const isLiveMeta = isEpgProvider && readyMeta !== null && (readyMeta.behaviorHints?.isLive === true || readyMeta.type === 'tv');
+    const presentation = useBilingualMetadata(isLiveMeta ? undefined : { type, id, scope: 'meta' }, { priority: 0 });
     useExternalPlayerCallback(urlParams, metaDetails);
     const [season, setSeason] = useSeason(urlParams);
     const [metaPath, streamPath] = React.useMemo(() => {
@@ -180,7 +184,7 @@ const MetaDetails = () => {
                     <div className={styles['background-image-layer']}>
                         <Image
                             className={styles['background-image']}
-                            src={metaDetails.metaItem.content.content.background}
+                            src={canonicalArtwork(presentation.metadata, 'background', metaDetails.metaItem.content.content.background, presentation.enabled)}
                             renderFallback={renderBackgroundImageFallback}
                             alt={' '}
                         />

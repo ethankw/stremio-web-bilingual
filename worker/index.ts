@@ -10,7 +10,7 @@ import type {
 } from './types';
 
 const SCHEMA_VERSION = 1;
-const MATCH_ALGORITHM_VERSION = 'typed-id-exact-v2';
+const MATCH_ALGORITHM_VERSION = 'english-presentation-v3';
 const DEFAULT_LOCALE = 'zh-CN';
 const MAX_RELEASE_SHA_LENGTH = 256;
 

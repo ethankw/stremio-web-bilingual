@@ -4,8 +4,9 @@ import React, { useCallback, useMemo, MouseEvent } from 'react';
 import Icon from '@stremio/stremio-icons/react';
 import classNames from 'classnames';
 import { useNavigateWithOrigin } from 'stremio-router';
-import { Button, HorizontalScroll, Image } from 'stremio/components';
+import { Button, HorizontalScroll } from 'stremio/components';
 import styles from './Cell.less';
+const CanonicalPoster = require('stremio/components/CanonicalPoster/CanonicalPoster');
 
 type Props = {
     selected: CalendarDate | null,
@@ -47,7 +48,8 @@ const Cell = ({ selected, monthInfo, date, items, onClick }: Props) => {
                     items.map(({ id, name, poster, deepLinks }) => (
                         <Button key={id} className={styles['item']} href={deepLinks.metaDetailsStreams} tabIndex={-1} onClick={(event) => onPosterClick(event, deepLinks.metaDetailsStreams)}>
                             <Icon className={styles['icon']} name={'play'} />
-                            <Image
+                            <CanonicalPoster
+                                detailHref={deepLinks.metaDetailsStreams}
                                 className={styles['poster']}
                                 src={poster}
                                 alt={name}
