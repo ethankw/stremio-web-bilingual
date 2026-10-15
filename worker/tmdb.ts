@@ -1,3 +1,4 @@
+import { tmdbIdFrom } from './identity';
 import type {
     BilingualMetadata,
     FetchFunction,
@@ -533,6 +534,21 @@ export const resolveMetadata = async (
     },
 ): Promise<BilingualMetadata> => {
     const { options, deadline } = requestOptions(token, dependencies);
+    const directId = tmdbIdFrom(identity.id);
+    if (directId !== null) {
+        if (identity.scope === 'episode') {
+            // Verify the explicitly typed parent before accepting an episode.
+            try {
+                const parent = validateDetails(await requestJson(tvDetailsUrl(directId), options, deadline), directId);
+                if (parent === null) return createMetadata(identity, 'unmatched', null, nowAsIso(options.now));
+            } catch (error) {
+                if (error instanceof TmdbFailure && error.kind === 'not-found') return createMetadata(identity, 'unmatched', null, nowAsIso(options.now));
+                throw error;
+            }
+            return resolveEpisode(identity, directId, options, deadline);
+        }
+        return resolveMovieOrSeries(identity, directId, options, deadline);
+    }
     let findPayload: unknown;
     try {
         findPayload = await requestJson(findUrl(identity.id), options, deadline);
@@ -589,7 +605,8 @@ export const resolvePeople = async (identity: MetadataIdentity, token: string, d
         matchStatus: 'unmatched', source: 'tmdb', people: [],
     };
     try {
-        const candidates = candidateId(await requestJson(findUrl(identity.id), options, deadline), identity.type);
+        const directId = tmdbIdFrom(identity.id);
+        const candidates = directId === null ? candidateId(await requestJson(findUrl(identity.id), options, deadline), identity.type) : [directId];
         if (candidates.length !== 1) {
             result.matchStatus = candidates.length > 1 ? 'ambiguous' : 'unmatched';
             return result;
