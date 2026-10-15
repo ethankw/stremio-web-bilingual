@@ -1,3 +1,4 @@
+import type { EnglishArtwork } from './artwork';
 export type SupportedType = 'movie' | 'series';
 
 export type MetadataScope = 'meta' | 'episode';
@@ -41,6 +42,7 @@ export type BilingualMetadata = {
         en: LocalizedText;
         zh: LocalizedText;
     };
+    artwork?: EnglishArtwork;
     fetchedAt: string;
     scope: MetadataScope;
     season?: number;
@@ -69,5 +71,6 @@ export type PeopleMetadata = {
     identity: BilingualMetadata['identity'];
     matchStatus: MatchStatus;
     source: 'tmdb';
-    people: { id: number; names: string[]; role: 'cast' | 'director'; image: string | null }[];
+    displayLocale: 'en-US';
+    people: { id: number; displayName: string; names: string[]; role: 'cast' | 'director'; image: string | null }[];
 };

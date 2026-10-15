@@ -4,7 +4,7 @@
 const DEFAULT_LOCALE = 'zh-CN';
 const ENGLISH_LOCALE = 'en-US';
 const CACHE_SCHEMA_VERSION = 1;
-const MATCH_ALGORITHM_VERSION = 'typed-id-exact-v2';
+const MATCH_ALGORITHM_VERSION = 'english-presentation-v3';
 const SUCCESS_TTL = 24 * 60 * 60 * 1000;
 const UNMATCHED_TTL = 30 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 512;

@@ -1,3 +1,4 @@
+import { englishArtwork } from './artwork';
 import { tmdbIdFrom } from './identity';
 import type {
     BilingualMetadata,
@@ -472,7 +473,8 @@ const resolveMovieOrSeries = async (
     options: TmdbOptions,
     deadline: number,
 ): Promise<BilingualMetadata> => {
-    const detailsUrl = identity.type === 'movie' ? movieDetailsUrl(tmdbId) : tvDetailsUrl(tmdbId);
+    const baseUrl = identity.type === 'movie' ? movieDetailsUrl(tmdbId) : tvDetailsUrl(tmdbId);
+    const detailsUrl = `${baseUrl}?language=en-US&append_to_response=images&include_image_language=en,null`;
     const translationsUrl = identity.type === 'movie' ? movieTranslationsUrl(tmdbId) : tvTranslationsUrl(tmdbId);
     let details: TmdbRecord | null;
     try {
@@ -490,7 +492,9 @@ const resolveMovieOrSeries = async (
     }
 
     const translations = await translationsOrEmpty(translationsUrl, tmdbId, options, deadline);
-    return createMetadata(identity, 'matched', tmdbId, nowAsIso(options.now), buildFields(identity, details, translations));
+    const metadata = createMetadata(identity, 'matched', tmdbId, nowAsIso(options.now), buildFields(identity, details, translations));
+    metadata.artwork = englishArtwork(details.images);
+    return metadata;
 };
 
 const resolveEpisode = async (
@@ -602,7 +606,7 @@ export const resolvePeople = async (identity: MetadataIdentity, token: string, d
     const result: PeopleMetadata = {
         schemaVersion: 1,
         identity: { stremioType: identity.type, stremioId: identity.id, tmdbId: null },
-        matchStatus: 'unmatched', source: 'tmdb', people: [],
+        matchStatus: 'unmatched', source: 'tmdb', displayLocale: 'en-US', people: [],
     };
     try {
         const directId = tmdbIdFrom(identity.id);
@@ -621,12 +625,13 @@ export const resolvePeople = async (identity: MetadataIdentity, token: string, d
         result.matchStatus = 'matched';
         const append = (person: unknown, role: 'cast' | 'director') => {
             if (!isRecord(person) || !isPositiveInteger(person.id)) return;
+            if (typeof person.name !== 'string' || !person.name.trim() || person.name.length > 200) return;
             const names = Array.from(new Set([person.name, person.original_name]
                 .filter((name): name is string => typeof name === 'string' && name.trim().length > 0 && name.length <= 200)
                 .map((name) => name.trim())));
             if (names.length === 0) return;
             const path = typeof person.profile_path === 'string' && /^\/[a-zA-Z0-9_-]+\.(?:jpg|png|webp)$/.test(person.profile_path) ? person.profile_path : null;
-            result.people.push({ id: person.id, names, role, image: path ? `https://image.tmdb.org/t/p/w45${path}` : null });
+            result.people.push({ id: person.id, displayName: typeof person.name === 'string' ? person.name.trim() : names[0], names, role, image: path ? `https://image.tmdb.org/t/p/w45${path}` : null });
         };
         payload.cast.slice(0, 100).forEach((person) => append(person, 'cast'));
         payload.crew.filter((person) => isRecord(person) && person.job === 'Director').slice(0, 20).forEach((person) => append(person, 'director'));

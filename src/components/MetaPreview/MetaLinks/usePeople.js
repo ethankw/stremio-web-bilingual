@@ -11,7 +11,7 @@ const usePeople = (identity, enabled) => {
     const type = identity?.type || identity?.stremioType;
     const id = identity?.id || identity?.stremioId;
     const valid = enabled && normalizeIdentity({ type, id, scope: 'meta' }).valid;
-    const key = valid ? `${type}:${id}` : '';
+    const key = valid ? `english-v1:${type}:${id}` : '';
     const [state, setState] = React.useState({ key: '', people: EMPTY });
     React.useEffect(() => {
         if (!key) return undefined;
@@ -31,7 +31,7 @@ const usePeople = (identity, enabled) => {
             const text = await response.text();
             if (text.length > 65536) throw new Error('Invalid credits');
             const result = JSON.parse(text);
-            if (result.schemaVersion !== 1 || result.source !== 'tmdb' || result.identity?.stremioId !== id || result.identity?.stremioType !== type || !Array.isArray(result.people)) throw new Error('Invalid credits');
+            if (result.displayLocale !== 'en-US' || result.schemaVersion !== 1 || result.source !== 'tmdb' || result.identity?.stremioId !== id || result.identity?.stremioType !== type || !Array.isArray(result.people)) throw new Error('Invalid credits');
             const people = result.matchStatus === 'matched' ? result.people.slice(0, 120) : EMPTY;
             if (!cancelled) {
                 cache.delete(key);

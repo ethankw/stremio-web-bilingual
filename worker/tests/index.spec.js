@@ -265,12 +265,13 @@ describe('bilingual metadata matching and protocol', () => {
                 en: expect.objectContaining({ text: 'An English overview.', evidence: 'translation-exact' }),
                 zh: expect.objectContaining({ text: '中文简介。', evidence: 'translation-exact' }),
             },
+            artwork: { policy: 'english-v1', poster: null, logo: null, background: null },
             fetchedAt: '2026-10-14T00:00:00.000Z',
             scope: 'meta',
         });
         expect(upstream.calls).toHaveLength(3);
         expect(upstream.calls[0][0]).toBe('https://api.themoviedb.org/3/find/tt0133093?external_source=imdb_id');
-        expect(upstream.calls[1][0]).toBe('https://api.themoviedb.org/3/movie/603');
+        expect(upstream.calls[1][0]).toBe('https://api.themoviedb.org/3/movie/603?language=en-US&append_to_response=images&include_image_language=en,null');
         expect(upstream.calls[2][0]).toBe('https://api.themoviedb.org/3/movie/603/translations');
         for (const [, init] of upstream.calls) {
             expect(init).toEqual(expect.objectContaining({
@@ -297,7 +298,7 @@ describe('bilingual metadata matching and protocol', () => {
         const response = await worker.fetch(requestFor('/api/bilingual/v1/meta?type=movie&id=tt0133093&zh=zh-CN'), makeEnv());
 
         expect((await bodyOf(response)).identity.tmdbId).toBe(101);
-        expect(upstream.calls[1][0]).toBe('https://api.themoviedb.org/3/movie/101');
+        expect(upstream.calls[1][0]).toBe('https://api.themoviedb.org/3/movie/101?language=en-US&append_to_response=images&include_image_language=en,null');
     });
 
     test('does not label a non-English original title as English', async () => {

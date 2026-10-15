@@ -24,6 +24,8 @@ npx --yes pnpm@11.8.0 dev:personal
 
 列表卡片和类型筛选的显示规则、简体中文语言包维护方式详见 [本次界面调整](Catalog_Chinese_Refinement.md)。
 
+海报、Logo、背景及演职员采用 [统一英文展示规则](English_Presentation_Policy.md)，不再因目录插件的中文资料而换一套展示。
+
 ## 私人 HTTPS 入口
 
 唯一使用入口固定为 **https://stremio2.ethankw.workers.dev/**。所有日常修改都在这个地址发布并验收，不再让用户切换到本地或 preview。参见 [固定入口规范](Delivery_Entry.md)。新地址可能需要用户自行登录一次原有 Stremio 账号，不要重装插件或复制登录令牌。

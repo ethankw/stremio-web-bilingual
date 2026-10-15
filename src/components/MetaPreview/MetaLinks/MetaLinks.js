@@ -35,10 +35,10 @@ const MetaLinks = ({ className, label, links, people }) => {
             {
                 Array.isArray(links) && links.length > 0 ?
                     <div className={styles['links-container']}>
-                        {links.map(({ label, href }, index) => (
+                        {links.map(({ label, href, personId }, index) => (
                             <Button key={index} className={styles['link-container']} title={label} href={href}>
-                                {(category === 'Cast' || category === 'Directors') ? <PersonAvatar image={personImage(people, label, category)} /> : null}
-                                { string(label) }
+                                {(category === 'Cast' || category === 'Directors') ? <PersonAvatar image={personImage(people, label, category, personId)} /> : null}
+                                { category === 'Cast' || category === 'Directors' ? label : string(label) }
                             </Button>
                         ))}
                     </div>
@@ -55,6 +55,7 @@ MetaLinks.propTypes = {
     people: PropTypes.array,
     links: PropTypes.arrayOf(PropTypes.shape({
         label: PropTypes.string,
+        personId: PropTypes.number,
         href: PropTypes.string
     }))
 };
