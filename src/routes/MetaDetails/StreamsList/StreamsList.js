@@ -12,6 +12,7 @@ const { Button, Image, MultiselectMenu } = require('stremio/components');
 const { useCore } = require('stremio/core');
 const Stream = require('./Stream');
 const classifyStreamSource = require('./classifyStreamSource');
+const sortStreamsByQuality = require('./sortStreamsByQuality');
 const styles = require('./styles');
 const { usePlatform, useProfile } = require('stremio/common');
 const { default: SeasonEpisodePicker } = require('../EpisodePicker');
@@ -54,8 +55,9 @@ const StreamsList = ({ className, video, type, externalPlayerCallbackCanMarkWatc
             .reduce((streamsByAddon, streams) => {
                 streamsByAddon[streams.addon.transportUrl] = {
                     addon: streams.addon,
-                    streams: streams.content.content.map((stream) => ({
+                    streams: streams.content.content.map((stream, index) => ({
                         ...stream,
+                        rowKey: `${streams.addon.transportUrl}:${index}`,
                         onClick: () => {
                             core.transport.analytics({
                                 event: 'StreamClicked',
@@ -82,11 +84,12 @@ const StreamsList = ({ className, video, type, externalPlayerCallbackCanMarkWatc
     }, [props.streams, profile.settings.playerType]);
     const effectiveSelectedAddon = Object.prototype.hasOwnProperty.call(streamsByAddon, selectedAddon) ? selectedAddon : ALL_ADDONS_KEY;
     const filteredStreams = React.useMemo(() => {
-        return effectiveSelectedAddon === ALL_ADDONS_KEY ?
+        const streams = effectiveSelectedAddon === ALL_ADDONS_KEY ?
             Object.values(streamsByAddon).map(({ streams }) => streams).flat(1)
             :
             streamsByAddon[effectiveSelectedAddon].streams;
-    }, [streamsByAddon, effectiveSelectedAddon]);
+        return type === 'movie' || type === 'series' ? sortStreamsByQuality(streams) : streams;
+    }, [streamsByAddon, effectiveSelectedAddon, type]);
     const selectableOptions = React.useMemo(() => {
         return {
             options: [
@@ -183,9 +186,9 @@ const StreamsList = ({ className, video, type, externalPlayerCallbackCanMarkWatc
                             :
                             <React.Fragment>
                                 <div className={styles['streams-container']} ref={streamsContainerRef}>
-                                    {filteredStreams.map((stream, index) => (
+                                    {filteredStreams.map((stream) => (
                                         <Stream
-                                            key={index}
+                                            key={stream.rowKey}
                                             videoId={video?.id}
                                             videoReleased={video?.released}
                                             addonName={stream.addonName}
