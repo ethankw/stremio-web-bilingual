@@ -1,6 +1,6 @@
 # Stream source labels
 
-Release names are informal, addon-supplied claims, not an international standard or verification of video bytes. This feature only annotates movie/series stream rows. It neither selects, reorders nor opens streams and never marks playback/watched state.
+Release names are informal, addon-supplied claims, not an international standard or verification of video bytes. This feature only annotates movie/series stream rows. It reorders displayed rows as described below, but never selects or opens a stream and never marks playback/watched state.
 
 ## Research and rules
 
@@ -31,3 +31,18 @@ externalUrl links (including discussion/analysis) and YouTube are not classified
 ## Validation
 
 Table-driven source tests cover variants, contradictory HD/CAM claims, uncertain sources, SD, misleading titles/extensions, multiline addon labels, metadata exclusion, external links and input immutability. Browser acceptance and release/rollback receipts are kept in the local task outputs, without publishing account library data.
+
+
+## Display ordering (added after the first chip release)
+
+Movie/series rows are sorted after the current addon filter is applied. The stable lexicographic key is:
+
+1. HD digital source, then camera source, then unknown source, then external utility links/YouTube.
+2. Within a film-source group, declared vertical resolution descending: 4320/8K, 2160/4K/UHD, 1440, 1080, 720, SD, then missing resolution. Resolution comes first from behaviorHints.filename, then externalPlayer.fileName, the first description line, then addon name lines. Conflicting resolutions in one field use the lower claim. These are labels, not measured pixels; no resolution claim can promote CAM or Unknown into HD.
+3. At equal resolution, digital provenance is ordered: explicitly disc-sourced REMUX, named BluRay/HD-DVD, WEB-DL, BDRip/BRRip/WEBRip/WEBMux/contextual WEB, then HDTV. A REMUX label on WEB-DL or BDRip does not restore lost source detail and does not earn the disc REMUX preference. The matched classification source controls this tiebreak, so a broad addon label cannot override a specific filename source.
+4. At equal declared camera resolution, Telesync precedes CAM only as a weak separately sourced audio hint. The letters HD/HQ by themselves add no rank.
+5. Equal or insufficient signals preserve original addon order. External utilities preserve their own order at the end. Sorting copies the array and retains original stream references, IDs, links, progress and callbacks. Stable per-addon row keys prevent a newly arriving higher-ranked row from inheriting another row's open-menu state.
+
+This is a conservative preference policy, not an objective measurement of visual quality. A high-resolution upscale can look worse than a good lower-resolution encode. Bitrate per pixel, compression generation, master quality, actual frames and audio cannot be reliably recovered from arbitrary filenames. File size without duration/tracks is not bitrate; seed counts indicate availability; x265/AV1/HDR/DV describe encoding or presentation rather than guaranteed fidelity. None adds score. Missing source/resolution is kept explicit rather than fabricated. Source vocabulary was cross-checked against the Radarr parser cited above; this preference policy is this Fork's documented design decision.
+
+Sorting regression tests cover class precedence, resolution aliases and contradictions, source tiebreaks, filename precedence, CAM versus TS, missing information, idempotence/stability, original-array/object identity and absence of callback execution. Other media types keep their prior ordering.
