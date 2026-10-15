@@ -17,6 +17,7 @@ const { AddonDetailsModal, Button, DelayedRenderer, Image, MainNavBars, MetaItem
 const { default: MetaPreviewSheet } = require('stremio/components/MetaPreviewSheet');
 const { default: EpgProgramModal } = require('stremio/components/EpgProgramModal');
 const useDiscover = require('./useDiscover');
+const useAnimatedWatchedFilter = require('./useAnimatedWatchedFilter');
 const useSelectableInputs = require('./useSelectableInputs');
 const { default: FiltersSheet } = require('./FiltersSheet');
 const { default: Guide } = require('./Guide');
@@ -60,6 +61,12 @@ const Discover = () => {
     const [addonModalOpen, openAddonModal, closeAddonModal] = useBinaryState(false);
     const [mobilePreviewOpen, openMobilePreview, closeMobilePreview] = useBinaryState(false);
     const [selectedMetaItemIndex, setSelectedMetaItemIndex] = React.useState(0);
+    const [hideWatched, setHideWatched] = React.useState(false);
+    const suppressScrollUntil = React.useRef(0);
+    const toggleHideWatched = React.useCallback(() => {
+        suppressScrollUntil.current = Date.now() + 600;
+        setHideWatched((hidden) => !hidden);
+    }, []);
     const isMobile = useMediaQuery(`(max-width: ${screenSizes.xsmall})`);
 
     const compactEpgDate = useMediaQuery(`(max-width: ${screenSizes.xsmall}) and (max-height: ${screenSizes['phone-landscape-size']}) and (orientation: landscape)`);
@@ -70,6 +77,16 @@ const Discover = () => {
     }, [discover.catalog, selectedMetaItemIndex]);
 
     const metasContainerRef = React.useRef();
+    const watchedAnimationActive = useAnimatedWatchedFilter(metasContainerRef, hideWatched, discover.catalog);
+    const loadedItems = discover.catalog?.content.type === 'Ready' ? discover.catalog.content.content : [];
+    const allLoadedHidden = hideWatched && loadedItems.length > 0 && loadedItems.every((item) => item.watched === true);
+    React.useEffect(() => {
+        if (discover.catalog?.content.type !== 'Ready') return;
+        const items = discover.catalog.content.content;
+        if (selectedMetaItemIndex < 0 || (hideWatched && items[selectedMetaItemIndex]?.watched === true)) {
+            setSelectedMetaItemIndex(items.findIndex((item) => !hideWatched || item.watched !== true));
+        }
+    }, [hideWatched, discover.catalog, selectedMetaItemIndex]);
     const metaPreviewRef = React.useRef();
     const previousCatalogSizeRef = React.useRef(0);
 
@@ -101,7 +118,7 @@ const Discover = () => {
             const catalogSize = discover.catalog.content.content.length;
             const hasNewItems = catalogSize > previousCatalogSizeRef.current;
             previousCatalogSizeRef.current = catalogSize;
-            if (!hasNextPage || !hasNewItems || !metasContainerRef.current) {
+            if (hideWatched || !hasNextPage || !hasNewItems || !metasContainerRef.current) {
                 return;
             }
 
@@ -111,7 +128,7 @@ const Discover = () => {
                 loadNextPage();
             }
         }
-    }, [discover.catalog, isEpgLayout, hasNextPage, loadNextPage]);
+    }, [discover.catalog, isEpgLayout, hasNextPage, loadNextPage, hideWatched]);
     const addToLibrary = React.useCallback(() => {
         if (selectedMetaItem === null) {
             return;
@@ -181,10 +198,10 @@ const Discover = () => {
         }
     }, [isMobile, selectedMetaItemIndex, openMobilePreview]);
     const onScrollToBottom = React.useCallback(() => {
-        if (hasNextPage) {
+        if (hasNextPage && !watchedAnimationActive.current && Date.now() >= suppressScrollUntil.current) {
             loadNextPage();
         }
-    }, [hasNextPage, loadNextPage]);
+    }, [hasNextPage, loadNextPage, watchedAnimationActive]);
     const onScroll = useOnScrollToBottom(onScrollToBottom, SCROLL_TO_BOTTOM_THRESHOLD);
     React.useEffect(() => {
         if (!isMobile) closeFilters();
@@ -242,25 +259,30 @@ const Discover = () => {
         return (
             <div ref={metasContainerRef} className={classnames(styles['meta-items-container'], 'animation-fade-in')} onScroll={onScroll} onFocusCapture={metaItemsOnFocusCapture}>
                 {discover.catalog.content.content.map((metaItem, index) => (
-                    <MetaItem
-                        key={index}
-                        bilingualIdentity={{ type: metaItem.type, id: metaItem.id, scope: 'meta' }}
-                        className={classnames({ 'selected': selectedMetaItemIndex === index })}
-                        type={metaItem.type}
-                        name={metaItem.name}
-                        releaseInfo={metaItem.releaseInfo}
-                        released={metaItem.released}
-                        links={metaItem.links}
-                        imdbRating={metaItem.imdbRating}
-                        poster={metaItem.poster}
-                        posterShape={metaItem.posterShape}
-                        playname={selectedMetaItemIndex === index}
-                        deepLinks={metaItem.deepLinks}
-                        watched={metaItem.watched}
-                        data-index={index}
-                        onClick={metaItemOnClick}
-                    />
+                    <div key={`${metaItem.type}:${metaItem.id}:${index}`} className={styles['watched-card']} data-discover-card={true} data-watched={metaItem.watched === true}>
+                        <MetaItem
+                            bilingualIdentity={{ type: metaItem.type, id: metaItem.id, scope: 'meta' }}
+                            className={classnames({ 'selected': selectedMetaItemIndex === index })}
+                            type={metaItem.type}
+                            name={metaItem.name}
+                            releaseInfo={metaItem.releaseInfo}
+                            released={metaItem.released}
+                            links={metaItem.links}
+                            imdbRating={metaItem.imdbRating}
+                            poster={metaItem.poster}
+                            posterShape={metaItem.posterShape}
+                            playname={selectedMetaItemIndex === index}
+                            deepLinks={metaItem.deepLinks}
+                            watched={metaItem.watched}
+                            data-index={index}
+                            onClick={metaItemOnClick}
+                        />
+                    </div>
                 ))}
+                {allLoadedHidden && <div className={styles['watched-empty']} role={'status'}>
+                    {t('DISCOVER_ALL_LOADED_WATCHED', { defaultValue: 'All loaded items have been watched.' })}
+                    {hasNextPage && <button type={'button'} onClick={loadNextPage}>{t('DISCOVER_LOAD_MORE', { defaultValue: 'Load more' })}</button>}
+                </div>}
             </div>
         );
     };
@@ -402,6 +424,12 @@ const Discover = () => {
                                 onClick={() => genreInput.onSelect(option.value)}
                             >{option.label}</button>
                         ))}
+                    </div>}
+                    {!isEpgLayout && <div className={styles['watched-controls']}>
+                        <button type={'button'} role={'switch'} aria-checked={hideWatched} className={styles['watched-switch']} onClick={toggleHideWatched}>
+                            <span className={styles['watched-switch-track']} aria-hidden={true}><span /></span>
+                            {t('DISCOVER_HIDE_WATCHED', { defaultValue: '隐藏已观看' })}
+                        </button>
                     </div>}
                     {
                         discover.catalog !== null && !discover.catalog.installed ?

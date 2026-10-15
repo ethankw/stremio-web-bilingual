@@ -29,5 +29,8 @@
     "STREAM_SOURCE_UNKNOWN": "未知",
     "STREAM_SOURCE_CAMERA_HINT": "命名含偷拍来源标记：{{source}}。仅根据资源命名推断，未验证实际视频。",
     "STREAM_SOURCE_DIGITAL_HINT": "命名含数码片源标记：{{source}}。仅根据资源命名推断，未验证实际分辨率与画质。",
-    "STREAM_SOURCE_UNKNOWN_HINT": "资源命名不足以确认是高清数码片源还是偷拍片源。"
+    "STREAM_SOURCE_UNKNOWN_HINT": "资源命名不足以确认是高清数码片源还是偷拍片源。",
+    "DISCOVER_HIDE_WATCHED": "隐藏已观看",
+    "DISCOVER_ALL_LOADED_WATCHED": "当前已加载的内容均已观看",
+    "DISCOVER_LOAD_MORE": "加载更多"
 }

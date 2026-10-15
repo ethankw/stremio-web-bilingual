@@ -3,6 +3,50 @@
 @import (reference) '~@stremio/stremio-colors/less/stremio-colors.less';
 @import (reference) '~stremio/common/screen-sizes.less';
 
+.watched-controls {
+    padding: 0.5rem 1.5rem 0.75rem;
+}
+
+.watched-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    border: 0;
+    border-radius: 0.5rem;
+    padding: 0.35rem;
+    color: var(--primary-foreground-color);
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    &:focus-visible { outline: 2px solid var(--primary-foreground-color); outline-offset: 3px; }
+
+    .watched-switch-track {
+        display: flex;
+        align-items: center;
+        width: 2.6rem;
+        height: 1.5rem;
+        padding: 0.2rem;
+        border-radius: 999px;
+        background: var(--overlay-color);
+        transition: background-color 180ms ease-out;
+        span {
+            width: 1.1rem;
+            height: 1.1rem;
+            border-radius: 50%;
+            background: var(--primary-foreground-color);
+            transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+    }
+    &[aria-checked='true'] .watched-switch-track {
+        background: var(--secondary-accent-color);
+        span { transform: translateX(1.1rem); }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .watched-switch .watched-switch-track, .watched-switch .watched-switch-track span { transition: none; }
+}
+
 :import('~stremio/components/MultiselectMenu/Label/Label.less') {
     multiselect-button: button;
 }
@@ -170,6 +214,9 @@
 
             .meta-items-container {
                 flex: 1;
+                --watched-motion-duration: 260;
+                --watched-motion-easing: cubic-bezier(0.22, 1, 0.36, 1);
+                overflow-anchor: none;
                 align-self: stretch;
                 display: grid;
                 grid-auto-rows: max-content;
@@ -177,6 +224,19 @@
                 grid-gap: 0.5rem;
                 margin-right: 1.5rem;
                 overflow-y: auto;
+
+                .watched-card {
+                    min-width: 0;
+                    transform-origin: center;
+                    &[hidden] { display: none; }
+                }
+
+                .watched-empty {
+                    grid-column: 1 / -1;
+                    padding: 2rem;
+                    text-align: center;
+                    button { display: block; margin: 1rem auto; padding: 0.6rem 1rem; border-radius: 999px; background: var(--overlay-color); color: inherit; }
+                }
 
                 .meta-item-placeholder {
                     padding: 1rem;

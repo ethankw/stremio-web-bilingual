@@ -63,3 +63,11 @@ export type WorkerDependencies = {
     clearTimeout?: typeof globalThis.clearTimeout;
     sleep?: (milliseconds: number) => Promise<void>;
 };
+
+export type PeopleMetadata = {
+    schemaVersion: 1;
+    identity: BilingualMetadata['identity'];
+    matchStatus: MatchStatus;
+    source: 'tmdb';
+    people: { id: number; names: string[]; role: 'cast' | 'director'; image: string | null }[];
+};
