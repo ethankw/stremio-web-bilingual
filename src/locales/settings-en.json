@@ -78,5 +78,11 @@
     "BILINGUAL_SOURCE_LICENSE": "Based on Stremio Web {{version}}. Source modifications remain available under GPL-2.0.",
     "BILINGUAL_BUILD": "Build: {{sha}}",
     "BILINGUAL_TMDB_NOTICE": "This product uses the TMDB API but is not endorsed or certified by TMDB.",
-    "SETTINGS_ENABLED": "Enabled"
+    "SETTINGS_ENABLED": "Enabled",
+    "DISCOVER_POPULAR": "Popular",
+    "DISCOVER_LATEST": "Latest",
+    "DISCOVER_PARTIAL_CATALOG": "Some movie lists could not be loaded. Showing available results.",
+    "DISCOVER_RETRY": "Retry",
+    "DISCOVER_NO_MOVIES": "No movies found.",
+    "DISCOVER_MISSING_METADATA": "Some movie details could not be verified. Missing IMDb scores or release dates appear last."
 }
