@@ -102,5 +102,11 @@
     "SETTINGS_PLUGIN_CHOICE_RUSSIAN": "俄语",
     "SETTINGS_PLUGIN_CHOICE_CAM": "偷拍版（CAM）",
     "SETTINGS_PLUGIN_CHOICE_SCR": "审片版（SCR）",
-    "SETTINGS_ENABLED": "已启用"
+    "SETTINGS_ENABLED": "已启用",
+    "DISCOVER_POPULAR": "热门",
+    "DISCOVER_LATEST": "最新",
+    "DISCOVER_PARTIAL_CATALOG": "部分电影列表暂时无法加载，当前显示已取得的结果。",
+    "DISCOVER_RETRY": "重试",
+    "DISCOVER_NO_MOVIES": "没有找到电影。",
+    "DISCOVER_MISSING_METADATA": "部分影片资料暂时无法核实。缺少 IMDb 评分或发行日期的影片排在最后。"
 }

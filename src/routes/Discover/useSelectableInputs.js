@@ -32,7 +32,7 @@ const mapSelectableInputs = (discover, t, navigate) => {
         options: discover.selectable.catalogs
             .map(({ id, name, addon, deepLinks }) => ({
                 value: deepLinks.discover,
-                label: t.catalogTitle({ addon, id, name }),
+                label: discover.aggregate ? t.string(id === 'popular' ? 'DISCOVER_POPULAR' : 'DISCOVER_LATEST') : t.catalogTitle({ addon, id, name }),
                 description: addon.manifest.name,
                 title: `${name} (${addon.manifest.name})`
             })),
@@ -42,8 +42,8 @@ const mapSelectableInputs = (discover, t, navigate) => {
         title: discover.selected !== null
             ? () => {
                 const selectableCatalog = discover.selectable.catalogs
-                    .find(({ id }) => id === discover.selected.request.path.id);
-                return selectableCatalog ? t.catalogTitle(selectableCatalog, false) : discover.selected.request.path.id;
+                    .find(({ selected }) => selected);
+                return discover.aggregate ? t.string(discover.aggregate.kind === 'popular' ? 'DISCOVER_POPULAR' : 'DISCOVER_LATEST') : selectableCatalog ? t.catalogTitle(selectableCatalog, false) : discover.selected.request.path.id;
             }
             :
             t.string('SELECT_CATALOG'),
@@ -87,7 +87,7 @@ const useSelectableInputs = (discover) => {
     const navigate = useNavigate();
     const selectableInputs = React.useMemo(() => {
         return mapSelectableInputs(discover, t, navigate);
-    }, [discover.selected, discover.selectable, t.string, t.stringWithPrefix, t.catalogTitle, navigate]);
+    }, [discover.selected, discover.selectable, discover.aggregate, t.string, t.stringWithPrefix, t.catalogTitle, navigate]);
     return selectableInputs;
 };
 

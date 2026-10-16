@@ -4,6 +4,7 @@ const React = require('react');
 const UrlUtils = require('url');
 const { useCore } = require('stremio/core');
 const { useModelState } = require('stremio/common');
+const useAggregatedDiscover = require('./useAggregatedDiscover');
 
 const map = (discover) => ({
     ...discover,
@@ -32,7 +33,9 @@ const useDiscover = (urlParams, queryParams) => {
             }
         }, 'discover');
     }, []);
+    const aggregated = !urlParams.type || urlParams.type === 'movie';
     const action = React.useMemo(() => {
+        if (aggregated) return null;
         if (typeof urlParams.transportUrl === 'string' && typeof urlParams.type === 'string' && typeof urlParams.catalogId === 'string') {
             const { hostname } = UrlUtils.parse(urlParams.transportUrl);
             if (typeof hostname === 'string' && hostname.length > 0) {
@@ -67,9 +70,10 @@ const useDiscover = (urlParams, queryParams) => {
         return {
             action: 'Unload'
         };
-    }, [urlParams, queryParams]);
+    }, [urlParams, queryParams, aggregated]);
     const discover = useModelState({ model: 'discover', action, map, deps: ['ctx'] });
-    return [discover, loadNextPage];
+    const visible = useAggregatedDiscover(core, discover, urlParams, queryParams);
+    return [visible, loadNextPage];
 };
 
 module.exports = useDiscover;
