@@ -443,13 +443,6 @@ const Discover = () => {
                             {t('DISCOVER_HIDE_WATCHED', { defaultValue: '隐藏已观看' })}
                         </button>
                     </div>}
-                    {discover.aggregate?.missing && <div className={styles['aggregate-warning']} role={'status'}>
-                        {t('DISCOVER_MISSING_METADATA', { defaultValue: 'Some movie details could not be verified. Missing IMDb scores or release dates appear last.' })}
-                    </div>}
-                    {discover.aggregate?.failed > 0 && <div className={styles['aggregate-warning']} role={'status'}>
-                        <span>{t('DISCOVER_PARTIAL_CATALOG', { defaultValue: 'Some movie lists could not be loaded. Showing available results.' })}</span>
-                        <button type={'button'} onClick={discover.aggregate.retry}>{t('DISCOVER_RETRY', { defaultValue: 'Retry' })}</button>
-                    </div>}
                     {
                         discover.catalog !== null && !discover.catalog.installed ?
                             <div className={styles['missing-addon-warning-container']}>
