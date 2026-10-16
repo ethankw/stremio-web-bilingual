@@ -230,11 +230,15 @@ module.exports = (env, argv) => ({
         argv.mode === 'production' &&
             new WorkboxPlugin.GenerateSW({
                 maximumFileSizeToCacheInBytes: 20000000,
-                clientsClaim: true,
-                skipWaiting: false
+                // Navigation must fetch the current HTML instead of pinning an
+                // old release in the precache. Keep versioned static assets fast.
+                exclude: [/\.map$/, /^manifest.*\.js$/, /^index\.html$/, /^_headers$/],
+                clientsClaim: false,
+                skipWaiting: true
             }),
         new CopyWebpackPlugin({
             patterns: [
+                { from: 'assets/_headers', to: '_headers', toType: 'file' },
                 { from: 'assets/favicons', to: 'favicons' },
                 { from: 'assets/images', to: 'images' },
                 { from: 'assets/screenshots/*.webp', to: 'screenshots/[name][ext]' },
