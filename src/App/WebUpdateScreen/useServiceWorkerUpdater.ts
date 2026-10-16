@@ -110,9 +110,17 @@ const useServiceWorkerUpdater = () => {
         };
         const onControlling = (event: WorkboxLifecycleEvent) => {
             clearApplyTimeout(runtime);
-            if (runtime.applying || reloadedForUpdate) {
+            if (runtime.applying) {
                 window.location.reload();
             } else if (event.isUpdate || event.isExternal) {
+                setDismissed(false);
+                setState({ status: 'reload-ready' });
+            }
+        };
+        // A new worker activates without taking over/reloading other tabs.
+        // Offer an explicit reload for pages that were already open.
+        const onActivated = (event: WorkboxLifecycleEvent) => {
+            if (!runtime.applying && (event.isUpdate || event.isExternal)) {
                 setDismissed(false);
                 setState({ status: 'reload-ready' });
             }
@@ -136,9 +144,11 @@ const useServiceWorkerUpdater = () => {
 
         workbox.addEventListener('waiting', onWaiting);
         workbox.addEventListener('controlling', onControlling);
+        workbox.addEventListener('activated', onActivated);
         workbox.register()
             .then(() => {
                 registered = true;
+                return workbox.update();
             })
             .catch((error) => {
                 console.error('SW registration failed: ', error);
@@ -148,6 +158,7 @@ const useServiceWorkerUpdater = () => {
             registered = false;
             workbox.removeEventListener('waiting', onWaiting);
             workbox.removeEventListener('controlling', onControlling);
+            workbox.removeEventListener('activated', onActivated);
             clearApplyTimeout(runtime);
             runtime.applying = false;
             runtime.checkForUpdate = null;
