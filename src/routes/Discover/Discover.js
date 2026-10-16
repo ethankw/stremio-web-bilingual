@@ -78,7 +78,7 @@ const Discover = () => {
 
     const metasContainerRef = React.useRef();
     const watchedAnimationActive = useAnimatedWatchedFilter(metasContainerRef, hideWatched, discover.catalog);
-    const loadedItems = discover.catalog?.content.type === 'Ready' ? discover.catalog.content.content : [];
+    const loadedItems = React.useMemo(() => discover.catalog?.content.type === 'Ready' ? discover.catalog.content.content : [], [discover.catalog]);
     const allLoadedHidden = hideWatched && loadedItems.length > 0 && loadedItems.every((item) => item.watched === true);
     React.useEffect(() => {
         if (discover.catalog?.content.type !== 'Ready') return;
@@ -177,26 +177,36 @@ const Discover = () => {
         }
     }, []);
     const metaItemOnClick = React.useCallback((event) => {
+        if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+            return;
+        }
+
         const index = Number(event.currentTarget.dataset.index);
-        const hasIndex = Number.isInteger(index);
+        if (!Number.isInteger(index) || index < 0 || index >= loadedItems.length) {
+            return;
+        }
 
-        if (isMobile && hasIndex) {
-            event.preventDefault();
-            setSelectedMetaItemIndex(index);
+        // A normal click only selects a preview, including the already selected card.
+        event.preventDefault();
+        setSelectedMetaItemIndex(index);
+        if (isMobile) {
             openMobilePreview();
-            return;
-        }
-
-        if (!hasIndex) {
-            return;
-        }
-
-        const visible = metaPreviewRef.current && window.getComputedStyle(metaPreviewRef.current).display !== 'none';
-        if (event.currentTarget.dataset.index !== selectedMetaItemIndex.toString() && visible) {
-            event.preventDefault();
+        } else {
             event.currentTarget.focus();
         }
-    }, [isMobile, selectedMetaItemIndex, openMobilePreview]);
+    }, [isMobile, loadedItems.length, openMobilePreview]);
+    const metaItemOnDoubleClick = React.useCallback((event) => {
+        if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+            return;
+        }
+
+        const index = Number(event.currentTarget.dataset.index);
+        const href = Number.isInteger(index) && index >= 0 ? getMetaDetailsHref(loadedItems[index]?.deepLinks) : null;
+        event.preventDefault();
+        if (typeof href === 'string') {
+            navigateWithOrigin(href);
+        }
+    }, [loadedItems, navigateWithOrigin]);
     const onScrollToBottom = React.useCallback(() => {
         if (hasNextPage && !watchedAnimationActive.current && Date.now() >= suppressScrollUntil.current) {
             loadNextPage();
@@ -276,6 +286,7 @@ const Discover = () => {
                             watched={metaItem.watched}
                             data-index={index}
                             onClick={metaItemOnClick}
+                            onDoubleClick={metaItemOnDoubleClick}
                         />
                     </div>
                 ))}

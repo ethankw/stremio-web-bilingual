@@ -211,7 +211,8 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                         .filter((category) => {
                             return category !== CONSTANTS.IMDB_LINK_CATEGORY &&
                                 category !== CONSTANTS.SHARE_LINK_CATEGORY &&
-                                category !== CONSTANTS.WRITERS_LINK_CATEGORY;
+                                category !== CONSTANTS.WRITERS_LINK_CATEGORY &&
+                                category !== 'Cast' && category !== 'Directors';
                         })
                         .map((category, index) => (
                             <MetaLinks
@@ -243,6 +244,17 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                             </div>
                             :
                             null
+                }
+                {
+                    ['Cast', 'Directors'].filter((category) => linksGroups.has(category)).map((category) => (
+                        <MetaLinks
+                            key={category}
+                            className={styles['meta-links']}
+                            label={category}
+                            links={linksGroups.get(category)}
+                            people={people}
+                        />
+                    ))
                 }
                 {children}
             </div>
