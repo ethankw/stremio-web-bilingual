@@ -166,3 +166,13 @@
         }
     }
 }
+.library-card {
+    min-width: 0;
+    transform-origin: center;
+    &[hidden] { display: none; }
+}
+.watched-empty {
+    grid-column: 1 / -1;
+    color: var(--primary-foreground-color);
+    padding: 1rem;
+}

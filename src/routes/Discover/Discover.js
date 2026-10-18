@@ -24,6 +24,7 @@ const { default: Guide } = require('./Guide');
 const { default: DaySelector } = require('./Guide/DaySelector');
 const { default: useLiveTvGuide } = require('./useLiveTvGuide');
 const styles = require('./styles');
+const useSavedBoolean = require('stremio/common/useSavedBoolean');
 
 const SCROLL_TO_BOTTOM_THRESHOLD = 400;
 
@@ -65,12 +66,12 @@ const Discover = () => {
     const itemKey = React.useCallback((item) => item ? JSON.stringify([item.type, item.id, item.aggregateSource || '']) : null, []);
     const selectedMetaItemIndex = selectedMetaItemKey === null ? 0 : loadedItems.findIndex((item) => itemKey(item) === selectedMetaItemKey);
     const setSelectedMetaItemIndex = React.useCallback((index) => setSelectedMetaItemKey(itemKey(loadedItems[index])), [loadedItems, itemKey]);
-    const [hideWatched, setHideWatched] = React.useState(false);
+    const [hideWatched, setHideWatched] = useSavedBoolean('stremio-discover-hide-watched-v1');
     const suppressScrollUntil = React.useRef(0);
     const toggleHideWatched = React.useCallback(() => {
         suppressScrollUntil.current = Date.now() + 600;
         setHideWatched((hidden) => !hidden);
-    }, []);
+    }, [setHideWatched]);
     const isMobile = useMediaQuery(`(max-width: ${screenSizes.xsmall})`);
 
     const compactEpgDate = useMediaQuery(`(max-width: ${screenSizes.xsmall}) and (max-height: ${screenSizes['phone-landscape-size']}) and (orientation: landscape)`);

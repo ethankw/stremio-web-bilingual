@@ -66,11 +66,11 @@ const Core = (props: Props) => {
             }
         };
 
+        window.onCoreEvent = onCoreEvent;
         transport
             .init(props.appInfo)
             .then(() => {
                 window.core = transport;
-                window.onCoreEvent = onCoreEvent;
                 setReady(true);
                 setError(null);
             })
