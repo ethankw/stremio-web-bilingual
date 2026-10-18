@@ -17,6 +17,7 @@ const styles = require('./styles');
 const watchedStyles = require('../Discover/styles');
 const useSavedBoolean = require('stremio/common/useSavedBoolean');
 const useAnimatedWatchedFilter = require('../Discover/useAnimatedWatchedFilter');
+const { useRouteActive } = require('stremio/common/useRouteFocused');
 
 const SCROLL_TO_BOTTOM_TRESHOLD = 400;
 
@@ -53,6 +54,7 @@ const Library = ({ model }) => {
     const navigate = useNavigate();
     const { t } = useTranslation();
     const profile = useProfile();
+    const routeActive = useRouteActive();
     const notifications = useNotifications();
     const [library, loadNextPage] = useLibrary(model, urlParams, queryParams);
     const [typeSelect, sortChips, hasNextPage] = useSelectableInputs(library);
@@ -63,7 +65,7 @@ const Library = ({ model }) => {
     const noVisibleItems = model === 'library' && hideWatched && library.catalog.length > 0 && library.catalog.every((item) => item.watched === true);
     const requestedHiddenPage = React.useRef(null);
     React.useEffect(() => {
-        if (model !== 'library' || !hideWatched || !hasNextPage) {
+        if (!routeActive || model !== 'library' || !hideWatched || !hasNextPage) {
             requestedHiddenPage.current = null;
             return undefined;
         }
@@ -76,7 +78,7 @@ const Library = ({ model }) => {
             }
         }, 300);
         return () => clearTimeout(timer);
-    }, [model, hideWatched, noVisibleItems, hasNextPage, library.catalog.length, loadNextPage]);
+    }, [routeActive, model, hideWatched, noVisibleItems, hasNextPage, library.catalog.length, loadNextPage]);
     const onScrollToBottom = React.useCallback(() => {
         if (hasNextPage && !watchedAnimationActive.current) {
             loadNextPage();
