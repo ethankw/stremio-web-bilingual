@@ -60,7 +60,11 @@ const Discover = () => {
     const activeFilterCount = selectInputs.filter(({ active }) => active).length;
     const [addonModalOpen, openAddonModal, closeAddonModal] = useBinaryState(false);
     const [mobilePreviewOpen, openMobilePreview, closeMobilePreview] = useBinaryState(false);
-    const [selectedMetaItemIndex, setSelectedMetaItemIndex] = React.useState(0);
+    const [selectedMetaItemKey, setSelectedMetaItemKey] = React.useState(null);
+    const loadedItems = React.useMemo(() => discover.catalog?.content.type === 'Ready' ? discover.catalog.content.content : [], [discover.catalog]);
+    const itemKey = React.useCallback((item) => item ? JSON.stringify([item.type, item.id, item.aggregateSource || '']) : null, []);
+    const selectedMetaItemIndex = selectedMetaItemKey === null ? 0 : loadedItems.findIndex((item) => itemKey(item) === selectedMetaItemKey);
+    const setSelectedMetaItemIndex = React.useCallback((index) => setSelectedMetaItemKey(itemKey(loadedItems[index])), [loadedItems, itemKey]);
     const [hideWatched, setHideWatched] = React.useState(false);
     const suppressScrollUntil = React.useRef(0);
     const toggleHideWatched = React.useCallback(() => {
@@ -78,7 +82,6 @@ const Discover = () => {
 
     const metasContainerRef = React.useRef();
     const watchedAnimationActive = useAnimatedWatchedFilter(metasContainerRef, hideWatched, discover.catalog);
-    const loadedItems = React.useMemo(() => discover.catalog?.content.type === 'Ready' ? discover.catalog.content.content : [], [discover.catalog]);
     const allLoadedHidden = hideWatched && loadedItems.length > 0 && loadedItems.every((item) => item.watched === true);
     React.useEffect(() => {
         if (discover.catalog?.content.type !== 'Ready') return;
@@ -86,7 +89,7 @@ const Discover = () => {
         if (selectedMetaItemIndex < 0 || (hideWatched && items[selectedMetaItemIndex]?.watched === true)) {
             setSelectedMetaItemIndex(items.findIndex((item) => !hideWatched || item.watched !== true));
         }
-    }, [hideWatched, discover.catalog, selectedMetaItemIndex]);
+    }, [hideWatched, discover.catalog, selectedMetaItemIndex, setSelectedMetaItemIndex]);
     const metaPreviewRef = React.useRef();
     const previousCatalogSizeRef = React.useRef(0);
 
@@ -175,7 +178,7 @@ const Discover = () => {
         if (event.target.dataset.index !== null && !isNaN(event.target.dataset.index)) {
             setSelectedMetaItemIndex(parseInt(event.target.dataset.index, 10));
         }
-    }, []);
+    }, [setSelectedMetaItemIndex]);
     const metaItemOnClick = React.useCallback((event) => {
         if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
             return;
@@ -194,7 +197,7 @@ const Discover = () => {
         } else {
             event.currentTarget.focus();
         }
-    }, [isMobile, loadedItems.length, openMobilePreview]);
+    }, [isMobile, loadedItems.length, openMobilePreview, setSelectedMetaItemIndex]);
     const metaItemOnDoubleClick = React.useCallback((event) => {
         if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
             return;
@@ -217,7 +220,7 @@ const Discover = () => {
         if (!isMobile) closeFilters();
         closeAddonModal();
         closeMobilePreview();
-        setSelectedMetaItemIndex(0);
+        setSelectedMetaItemKey(null);
         setSelectedEpgProgram(null);
     }, [discover.selected, isMobile, closeFilters, closeAddonModal, closeMobilePreview]);
     const renderEmptyState = () => (
@@ -270,7 +273,7 @@ const Discover = () => {
             <div ref={metasContainerRef} className={classnames(styles['meta-items-container'], 'animation-fade-in')} onScroll={onScroll} onFocusCapture={metaItemsOnFocusCapture}>
                 {discover.catalog.content.content.length === 0 && <div className={styles['watched-empty']} role={'status'}>{t('DISCOVER_NO_MOVIES', { defaultValue: 'No movies found.' })}</div>}
                 {discover.catalog.content.content.map((metaItem, index) => (
-                    <div key={`${metaItem.type}:${metaItem.id}:${index}`} className={styles['watched-card']} data-discover-card={true} data-watched={metaItem.watched === true}>
+                    <div key={itemKey(metaItem)} className={styles['watched-card']} data-discover-card={true} data-watched={metaItem.watched === true}>
                         <MetaItem
                             bilingualIdentity={{ type: metaItem.type, id: metaItem.id, scope: 'meta' }}
                             className={classnames({ 'selected': selectedMetaItemIndex === index })}
