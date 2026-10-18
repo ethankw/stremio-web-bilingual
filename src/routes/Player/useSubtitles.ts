@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import useSavedBoolean from 'stremio/common/useSavedBoolean';
 import { CONSTANTS, getKeyboardShortcutKeys, languages, useFileDropListener, useInterval, useShortcut, useTimeout, useToast } from 'stremio/common';
 import {
     getSubtitleDelayStepMultiplier,
@@ -36,9 +37,9 @@ const normalizeLanguage = (language?: string | null) => {
     }
 
     const value = language.trim();
-    const normalized = languages.find(value) ?? languages.find(value.toLowerCase());
+    const normalized = languages.find(value) ?? languages.find(value.toLowerCase()) ?? languages.find(value.toLowerCase().replace('_', '-').split('-')[0]);
 
-    return normalized?.code;
+    return ['zhe', 'zht'].includes(normalized?.code || '') ? 'zho' : normalized?.code;
 };
 
 const findTrackByLanguage = (tracks: SubtitleTrack[], language?: string | null) => {
@@ -92,7 +93,7 @@ const resolveCandidate = (
     const track = candidate.id ?
         findTrackById(tracks, candidate.id)
         :
-        findTrackByLanguage(tracks, candidate.language);
+        candidate.language ? findTrackByLanguage(tracks, candidate.language) : tracks[0];
 
     return track && (!candidate.language || normalizeLanguage(track.lang) === candidate.language) ?
         track
@@ -123,29 +124,21 @@ const buildCandidates = (
         }
     };
 
-    if (savedTrack?.id && (!sessionEnabled ||
-        !sessionPreference.source || sessionPreference.source === savedSource)) {
-        candidates.push({
-            source: savedSource as SubtitleSource,
-            id: savedTrack.id,
-            ...(sessionLanguage ? { language: sessionLanguage } : {}),
-        });
-    }
-
-    if (sessionEnabled) {
-        addLanguage(sessionLanguage ?? savedLanguage);
-    } else {
-        addLanguage(savedLanguage);
-    }
+    // A previous movie's language/track cannot outrank the user's preference.
     addLanguage(normalizeLanguage(globalLanguage));
-    if (sessionEnabled) {
-        addLanguage(normalizeLanguage(CONSTANTS.DEFAULT_SUBTITLES_LANGUAGE));
-    }
-
-    // Keep language ahead of source so the selected language can cross source types.
+    addLanguage(normalizeLanguage('eng'));
+    addLanguage(sessionLanguage);
+    addLanguage(savedLanguage);
     languagesOrder.forEach((language) => {
-        sources.forEach((source) => candidates.push({ source, language }));
+        sources.forEach((source) => {
+            if (savedTrack?.id && savedLanguage === language && savedSource === source) {
+                candidates.push({ source, id: savedTrack.id, language });
+            }
+            candidates.push({ source, language });
+        });
     });
+    // Enabled means show any available subtitles, even without a language match.
+    sources.forEach((source) => candidates.push({ source }));
 
     return candidates;
 };
@@ -188,6 +181,7 @@ const useSubtitles = ({
     const { t } = useTranslation();
     const { setSubtitlesTrack, setExtraSubtitlesTrack, setSubtitlesDelay, setSubtitlesSize, setSubtitlesOffset } = video;
     const toast = useToast();
+    const [subtitlesEnabled, setSubtitlesEnabled] = useSavedBoolean('stremio-player-subtitles-enabled-v1', settings.subtitlesLanguage !== null);
     const videoRef = useRef(video);
     const settingsRef = useRef(settings);
     const trackSelectionLocked = useRef(false);
@@ -225,6 +219,7 @@ const useSubtitles = ({
     }, []);
 
     const rememberTrack = useCallback((track: SubtitleTrack, embedded: boolean) => {
+        setSubtitlesEnabled(true);
         const language = normalizeLanguage(track.lang);
         lastSelectedTrack.current = {
             id: track.id,
@@ -243,9 +238,10 @@ const useSubtitles = ({
             source: embedded ? 'embedded' : 'external',
             ...(language ? { language } : {}),
         });
-    }, [streamStateChanged, subtitlePreferenceChanged]);
+    }, [streamStateChanged, subtitlePreferenceChanged, setSubtitlesEnabled]);
 
     const disableSubtitles = useCallback(() => {
+        setSubtitlesEnabled(false);
         const selectedTrack = video.state.selectedSubtitlesTrackId !== null ?
             findTrackById(video.state.subtitlesTracks, video.state.selectedSubtitlesTrackId)
             :
@@ -272,6 +268,7 @@ const useSubtitles = ({
         });
     }, [
         player.subtitlePreference,
+        setSubtitlesEnabled,
         streamStateChanged,
         subtitlePreferenceChanged,
         setSubtitlesTrack,
@@ -401,9 +398,14 @@ const useSubtitles = ({
 
     useEffect(() => {
         if (video.state.stream !== null) {
-            video.addExtraSubtitlesTracks(externalSubtitles);
+            // The streaming-server wrapper can strip stream-provided subtitles
+            // when the browser plays a URL directly. Register them explicitly.
+            video.addExtraSubtitlesTracks([
+                ...streamSubtitles.map((track) => ({ ...track, origin: 'EXCLUSIVE', exclusive: true })),
+                ...externalSubtitles,
+            ]);
         }
-    }, [externalSubtitles, video.state.stream]);
+    }, [externalSubtitles, streamSubtitles, video.state.stream]);
 
     useEffect(() => {
         trackSelectionLocked.current = false;
@@ -419,7 +421,7 @@ const useSubtitles = ({
         const sessionPreference = player.subtitlePreference;
         const sessionEnabled = sessionPreference?.enabled === true;
 
-        if (sessionPreference?.enabled === false || (!sessionEnabled && settings.subtitlesLanguage === null)) {
+        if (!subtitlesEnabled) {
             if (video.state.selectedSubtitlesTrackId !== null ||
                 video.state.selectedExtraSubtitlesTrackId !== null) {
                 setSubtitlesTrack(null);
@@ -493,6 +495,7 @@ const useSubtitles = ({
         player.subtitlePreference,
         player.streamState,
         settings.subtitlesLanguage,
+        subtitlesEnabled,
         setSubtitlesTrack,
         setExtraSubtitlesTrack,
         setSubtitlesDelay,
@@ -557,7 +560,7 @@ const useSubtitles = ({
 
         const onExtraSubtitlesTrackAdded = (track: SubtitleTrack) => {
             if (track.local) {
-                videoRef.current.setExtraSubtitlesTrack(track.id);
+                selectExtraTrack(track);
             }
         };
 
@@ -572,7 +575,7 @@ const useSubtitles = ({
             video.events.off('extraSubtitlesTrackAdded', onExtraSubtitlesTrackAdded);
             video.events.off('implementationChanged', applySubtitleStyle);
         };
-    }, [applySubtitleStyle, t, toast, video.events]);
+    }, [applySubtitleStyle, t, toast, video.events, selectExtraTrack]);
 
     useShortcut('subtitlesDelay', startSubtitleDelayHold, !menusOpen);
 
@@ -620,6 +623,7 @@ const useSubtitles = ({
 
         trackSelectionLocked.current = false;
         appliedTrack.current = null;
+        setSubtitlesEnabled(true);
         subtitlePreferenceChanged({
             enabled: true,
             ...(source ? { source } : {}),
@@ -627,6 +631,7 @@ const useSubtitles = ({
         });
     }, [
         disableSubtitles,
+        setSubtitlesEnabled,
         player.subtitlePreference,
         player.streamState,
         subtitlePreferenceChanged,
@@ -692,4 +697,5 @@ const useSubtitles = ({
     };
 };
 
+export { buildCandidates, resolveBestCandidate };
 export default useSubtitles;

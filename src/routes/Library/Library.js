@@ -14,6 +14,9 @@ const { default: Placeholder } = require('./Placeholder');
 const useLibrary = require('./useLibrary');
 const useSelectableInputs = require('./useSelectableInputs');
 const styles = require('./styles');
+const watchedStyles = require('../Discover/styles');
+const useSavedBoolean = require('stremio/common/useSavedBoolean');
+const useAnimatedWatchedFilter = require('../Discover/useAnimatedWatchedFilter');
 
 const SCROLL_TO_BOTTOM_TRESHOLD = 400;
 
@@ -53,18 +56,32 @@ const Library = ({ model }) => {
     const notifications = useNotifications();
     const [library, loadNextPage] = useLibrary(model, urlParams, queryParams);
     const [typeSelect, sortChips, hasNextPage] = useSelectableInputs(library);
-    const watchedSort = model === 'library' ? library.selected?.request?.sort : null;
-    const emptyLabel = watchedSort === 'watched' ?
-        t('LIBRARY_EMPTY_WATCHED', { defaultValue: 'No watched items in this category.' }) :
-        watchedSort === 'notwatched' ?
-            t('LIBRARY_EMPTY_UNWATCHED', { defaultValue: 'No unwatched items in this category.' }) :
-            t(model === 'library' ? 'LIBRARY_EMPTY' : 'BOARD_CONTINUE_WATCHING_EMPTY');
+    const [hideWatched, setHideWatched] = useSavedBoolean('stremio-library-hide-watched-v1');
+    const emptyLabel = t(model === 'library' ? 'LIBRARY_EMPTY' : 'BOARD_CONTINUE_WATCHING_EMPTY');
     const scrollContainerRef = React.useRef(null);
+    const watchedAnimationActive = useAnimatedWatchedFilter(scrollContainerRef, model === 'library' && hideWatched, library.catalog);
+    const noVisibleItems = model === 'library' && hideWatched && library.catalog.length > 0 && library.catalog.every((item) => item.watched === true);
+    const requestedHiddenPage = React.useRef(null);
+    React.useEffect(() => {
+        if (model !== 'library' || !hideWatched || !hasNextPage) {
+            requestedHiddenPage.current = null;
+            return undefined;
+        }
+        const pageKey = JSON.stringify([hasNextPage, library.catalog.length]);
+        const timer = setTimeout(() => {
+            const container = scrollContainerRef.current;
+            if ((noVisibleItems || container && container.scrollHeight <= container.clientHeight + SCROLL_TO_BOTTOM_TRESHOLD) && requestedHiddenPage.current !== pageKey) {
+                requestedHiddenPage.current = pageKey;
+                loadNextPage();
+            }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [model, hideWatched, noVisibleItems, hasNextPage, library.catalog.length, loadNextPage]);
     const onScrollToBottom = React.useCallback(() => {
-        if (hasNextPage) {
+        if (hasNextPage && !watchedAnimationActive.current) {
             loadNextPage();
         }
-    }, [hasNextPage, loadNextPage]);
+    }, [hasNextPage, loadNextPage, watchedAnimationActive]);
     const onScroll = useOnScrollToBottom(onScrollToBottom, SCROLL_TO_BOTTOM_TRESHOLD);
     React.useLayoutEffect(() => {
         if (scrollContainerRef.current !== null && library.selected && library.selected.request.page === 1 && library.catalog.length !== 0) {
@@ -85,6 +102,12 @@ const Library = ({ model }) => {
                             <MultiselectMenu {...typeSelect} className={styles['select-input-container']} />
                             <Chips {...sortChips} className={styles['select-input-container']} />
                         </div>
+                        {model === 'library' && <div className={watchedStyles['watched-controls']}>
+                            <button type={'button'} role={'switch'} aria-checked={hideWatched} className={watchedStyles['watched-switch']} onClick={() => setHideWatched((value) => !value)}>
+                                <span className={watchedStyles['watched-switch-track']} aria-hidden={true}><span /></span>
+                                {t('DISCOVER_HIDE_WATCHED', { defaultValue: '隐藏已观看' })}
+                            </button>
+                        </div>}
                         {
                             library.selected === null ?
                                 <DelayedRenderer delay={500}>
@@ -111,15 +134,17 @@ const Library = ({ model }) => {
                                     <div ref={scrollContainerRef} className={classnames(styles['meta-items-container'], 'animation-fade-in')} onScroll={onScroll}>
                                         {
                                             library.catalog.map((libItem) => (
-                                                <LibItem
-                                                    {...libItem}
-                                                    key={`${libItem.type}:${libItem._id}`}
-                                                    notifications={notifications}
-                                                    removable={model === 'library'}
-                                                    detailsVideosFirst={model === 'library'}
-                                                />
+                                                <div key={`${libItem.type}:${libItem._id}`} className={styles['library-card']} data-discover-card={true} data-watched={libItem.watched === true}>
+                                                    <LibItem
+                                                        {...libItem}
+                                                        notifications={notifications}
+                                                        removable={model === 'library'}
+                                                        detailsVideosFirst={model === 'library'}
+                                                    />
+                                                </div>
                                             ))
                                         }
+                                        {noVisibleItems && !hasNextPage && <div className={styles['watched-empty']}>{t('LIBRARY_EMPTY_UNWATCHED')}</div>}
                                     </div>
                         }
                     </div>

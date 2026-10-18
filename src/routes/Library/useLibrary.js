@@ -3,8 +3,7 @@
 const React = require('react');
 const { useCore } = require('stremio/core');
 const { useModelState } = require('stremio/common');
-
-const filterWatchedLibrary = require('./filterWatchedLibrary');
+const { normalizeLibrarySort } = require('./filterWatchedLibrary');
 
 const useLibrary = (model, urlParams, queryParams) => {
     const core = useCore();
@@ -23,14 +22,13 @@ const useLibrary = (model, urlParams, queryParams) => {
             args: {
                 request: {
                     type: typeof urlParams.type === 'string' ? urlParams.type : null,
-                    sort: queryParams.has('sort') ? queryParams.get('sort') : undefined,
+                    sort: normalizeLibrarySort(queryParams.get('sort')),
                 }
             }
         }
     }), [urlParams, queryParams]);
     const library = useModelState({ model, action });
-    const visibleLibrary = React.useMemo(() => filterWatchedLibrary(library, model), [library, model]);
-    return [visibleLibrary, loadNextPage];
+    return [library, loadNextPage];
 };
 
 module.exports = useLibrary;
