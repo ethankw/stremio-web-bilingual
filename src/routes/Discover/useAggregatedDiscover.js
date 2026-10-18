@@ -69,6 +69,8 @@ const useAggregatedDiscover = (core, raw, urlParams, queryParams) => {
     )) ? 'latest' : 'popular';
     const [revision, refresh] = React.useReducer((value) => value + 1, 0);
     const [result, setResult] = React.useState(null);
+    const resultRef = React.useRef(result);
+    resultRef.current = result;
     const requestKey = `${addonsKey}|${kind}`;
     const requestedGenre = queryParams.get('genre');
     const genre = /^\d{4}$/.test(requestedGenre || '') && urlParams.transportUrl !== 'unified' ? null : requestedGenre;
@@ -91,9 +93,17 @@ const useAggregatedDiscover = (core, raw, urlParams, queryParams) => {
     React.useEffect(() => {
         if (!enabled || !active) return undefined;
         const controller = new AbortController();
+        // Retain a complete visible list during background refreshes. On first
+        // entry, publish each available page without waiting for slow providers.
+        const showProgress = resultRef.current?.key !== requestKey;
         (async () => {
             try {
-                const collected = await collectCatalogs(core, sources, controller.signal);
+                const collected = await collectCatalogs(core, sources, controller.signal, undefined, (partial) => {
+                    if (showProgress && !controller.signal.aborted) {
+                        const items = mergeItems(partial.items.map((item) => normalizeItem(item, null)), kind);
+                        setResult({ key: requestKey, items, failed: partial.failed, missing: false });
+                    }
+                });
                 const cinemeta = addons.find((addon) => addon.manifest.id === 'com.linvo.cinemeta');
                 const enriched = await enrichItems(collected.items, cinemeta, controller.signal);
                 if (!controller.signal.aborted) setResult({ key: requestKey, items: mergeItems(enriched.items, kind), failed: collected.failed, missing: enriched.missing });

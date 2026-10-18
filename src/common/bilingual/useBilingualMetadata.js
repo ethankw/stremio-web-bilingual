@@ -99,15 +99,15 @@ const useBilingualMetadata = (identity, options = {}) => {
         observer.observe(node);
     }, [enabled, identityKey, lazy]);
 
+    // The callback ref owns identity changes. A previous identity's passive
+    // cleanup runs after the new ref is attached and must not disconnect it.
     React.useEffect(() => () => {
         if (observerRef.current !== null) {
             observerRef.current.disconnect();
             observerRef.current = null;
         }
-        if (visibleKeyRef.current === identityKey) {
-            visibleKeyRef.current = null;
-        }
-    }, [identityKey]);
+        visibleKeyRef.current = null;
+    }, []);
 
     const currentResult = enabled && availability === 'available' && resultState.key === identityKey ? resultState : {
         metadata: null,

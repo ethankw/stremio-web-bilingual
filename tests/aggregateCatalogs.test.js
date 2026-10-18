@@ -144,3 +144,27 @@ test('provider placeholder errors are failures and no-result placeholders are no
         await expect(fetchCatalogPage(request, 0, new AbortController().signal)).resolves.toEqual([]);
     } finally { global.fetch = original; }
 });
+
+test('publishes sorted usable pages before a later provider completes', async () => {
+    let releaseSlow;
+    let slowStarted;
+    const started = new Promise((resolve) => { slowStarted = resolve; });
+    const core = fakeCore((id) => ({ type: 'Ready', content: [movie(id === 'fast' ? 'tt0000001' : 'tt0000002', id)] }));
+    const fetchPage = async (request, offset) => {
+        if (request.path.id === 'slow') {
+            slowStarted();
+            await new Promise((resolve) => { releaseSlow = resolve; });
+        }
+        return core.fetchPage(request, offset);
+    };
+    const progress = jest.fn();
+    const pending = collectCatalogs(core, [source('fast'), source('slow')], new AbortController().signal, fetchPage, progress);
+    await started;
+    expect(progress).toHaveBeenCalledTimes(1);
+    expect(progress.mock.calls[0][0].items.map((item) => item.name)).toEqual(['fast']);
+    releaseSlow();
+    const result = await pending;
+    expect(result.items.map((item) => item.name)).toEqual(['fast', 'slow']);
+    expect(progress.mock.calls[0][0].items).toHaveLength(1); // snapshots cannot mutate later
+    expect(core.listeners.size).toBe(0);
+});

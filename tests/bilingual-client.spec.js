@@ -99,14 +99,17 @@ const createHookHarness = (client) => {
     const slots = [];
     const effectFunctions = [];
     const effectCleanups = new Map();
+    const pendingEffects = new Set();
+    const sameDeps = (a, b) => a && b && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
     let cursor = 0;
     let output = null;
     let hook;
     const settings = { enabled: true, titleOrder: 'en-first', overviewOrder: 'zh-first' };
     const reactMock = {
-        useMemo: (factory) => {
-            cursor += 1;
-            return factory();
+        useMemo: (factory, deps) => {
+            const index = cursor++;
+            if (!slots[index] || !sameDeps(slots[index].deps, deps)) slots[index] = { deps, value: factory() };
+            return slots[index].value;
         },
         useRef: (initialValue) => {
             const index = cursor;
@@ -128,15 +131,13 @@ const createHookHarness = (client) => {
                 slots[index].value = typeof nextValue === 'function' ? nextValue(slots[index].value) : nextValue;
             }];
         },
-        useEffect: (effect) => {
-            const index = cursor;
-            cursor += 1;
+        useEffect: (effect, deps) => {
+            const index = cursor++;
+            if (!slots[index] || !sameDeps(slots[index].deps, deps)) pendingEffects.add(index);
+            slots[index] = { deps };
             effectFunctions[index] = effect;
         },
-        useCallback: (callback) => {
-            cursor += 1;
-            return callback;
-        },
+        useCallback: (callback, deps) => reactMock.useMemo(() => callback, deps),
     };
 
     jest.isolateModules(() => {
@@ -162,12 +163,13 @@ const createHookHarness = (client) => {
             return output;
         },
         runEffects: () => {
-            Object.entries(effectFunctions).forEach(([index, effect]) => {
-                const cleanup = effect();
-                if (typeof cleanup === 'function') {
-                    effectCleanups.set(index, cleanup);
-                }
+            pendingEffects.forEach((index) => effectCleanups.get(index)?.());
+            pendingEffects.forEach((index) => {
+                effectCleanups.delete(index);
+                const cleanup = effectFunctions[index]();
+                if (typeof cleanup === 'function') effectCleanups.set(index, cleanup);
             });
+            pendingEffects.clear();
         },
         getOutput: () => output,
     };
@@ -972,6 +974,40 @@ describe('bilingual metadata hook contract', () => {
             } else {
                 global.IntersectionObserver = previousIntersectionObserver;
             }
+        }
+    });
+
+    test('keeps the new visibility observer alive when a reused card changes identity', () => {
+        const previous = global.IntersectionObserver;
+        const observers = [];
+        global.IntersectionObserver = class {
+            constructor(callback) { this.callback = callback; this.disconnected = false; observers.push(this); }
+            observe() {}
+            disconnect() { this.disconnected = true; }
+        };
+        const client = createHookClient();
+        const harness = createHookHarness(client);
+        try {
+            const first = harness.render({ type: 'movie', id: 'tt1234567' }, { lazy: true });
+            first.ref({});
+            harness.runEffects();
+            observers[0].callback([{ isIntersecting: true }]);
+            client.subscriptions[0].onChange({ metadata: metadataFor({ type: 'movie', id: 'tt1234567', scope: 'meta' }), status: 'ready' });
+
+            const next = harness.render({ type: 'movie', id: 'tt1234568' }, { lazy: true });
+            first.ref(null);
+            next.ref({}); // React attaches the new ref before old passive cleanups.
+            harness.runEffects();
+            expect(observers[1].disconnected).toBe(false);
+            observers[1].callback([{ isIntersecting: true }]);
+            expect(client.subscriptions[1].started).toBe(true);
+            const metadata = metadataFor({ type: 'movie', id: 'tt1234568', scope: 'meta' });
+            client.subscriptions[1].onChange({ metadata, status: 'ready' });
+            expect(harness.render({ type: 'movie', id: 'tt1234568' }, { lazy: true })).toMatchObject({ metadata, status: 'ready' });
+        } finally {
+            harness.cleanupEffects();
+            if (previous === undefined) delete global.IntersectionObserver;
+            else global.IntersectionObserver = previous;
         }
     });
 

@@ -178,7 +178,7 @@ const fetchCatalogPage = async (request, offset, signal) => {
     } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
 };
 
-const collectCatalogs = async (core, sources, signal, fetchPage = fetchCatalogPage) => {
+const collectCatalogs = async (core, sources, signal, fetchPage = fetchCatalogPage, onProgress = null) => {
     const items = [];
     let failed = 0;
     for (const source of sources) {
@@ -201,6 +201,7 @@ const collectCatalogs = async (core, sources, signal, fetchPage = fetchCatalogPa
                 const batch = state.catalog.content.content;
                 const next = batch.filter((item) => !collectedIds.has(item.id));
                 items.push(...next.slice(0, SOURCE_LIMIT - collectedIds.size).map((item) => ({ ...item, aggregateCinemeta: source.cinemeta, aggregateSource: source.request.base })));
+                if (!signal.aborted) onProgress?.({ items: [...items], failed });
                 collectedIds = new Set(batch.map((item) => item.id));
                 offset += raw.length;
                 if (!source.paginated) break;
