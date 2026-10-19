@@ -73,7 +73,7 @@ const useDiscover = (urlParams, queryParams, filters) => {
     }, [urlParams, queryParams, aggregated]);
     const discover = useModelState({ model: 'discover', action, map, deps: ['ctx'] });
     const visible = useAggregatedDiscover(core, discover, urlParams, queryParams, filters);
-    return [visible, loadNextPage];
+    return [visible, visible.aggregate?.loadNextPage || loadNextPage];
 };
 
 module.exports = useDiscover;

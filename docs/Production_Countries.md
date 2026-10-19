@@ -19,3 +19,5 @@ References: https://developer.themoviedb.org/reference/movie-details and https:/
 ## Simplification rollback
 
 The country-chip release before this simplification is `f6ddb997-8668-4a8b-b046-b3ef2b32ae5c` (Git `c3b7a99cba984c60aa6594eeda7e83748295fead`). To restore it, run `pnpm exec wrangler rollback f6ddb997-8668-4a8b-b046-b3ef2b32ae5c --config wrangler.personal.jsonc --message "Restore country-chip release" --yes` from the release checkout. The new switch preference is harmless when rolling back and does not change the old per-country preference.
+
+2026-10-19 更新：地区隐藏不再将国别未知、请求失败或尚未解析视为命中排除地区；这些影片保留，仅明确包含屏蔽地区的合拍片被隐藏。详情国别展示及排除地区集合不变。

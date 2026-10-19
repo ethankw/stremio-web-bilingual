@@ -3,7 +3,7 @@
 const React = require('react');
 const { useProfile } = require('stremio/common');
 const { useRouteActive } = require('stremio/common/useRouteFocused');
-const { getSources, imdbId, normalizeItem, mergeItems, collectCatalogs } = require('./aggregateCatalogs');
+const { getSources, imdbId, normalizeItem, mergeItems, createCatalogPager } = require('./aggregateCatalogs');
 
 const canonicalCache = new Map();
 const { filterHref } = require('./discoverFilters');
@@ -74,8 +74,9 @@ const useAggregatedDiscover = (core, raw, urlParams, queryParams, filters) => {
     const [result, setResult] = React.useState(null);
     const resultRef = React.useRef(result);
     resultRef.current = result;
-    const requestKey = `${addonsKey}|${typesKey}|${kind}`;
-    const sources = React.useMemo(() => getSources(addons, kind, new Date(), types), [addons, kind, types]);
+    const sessionRef = React.useRef(null);
+    const requestKey = `${addonsKey}|${typesKey}|${kind}|${genre || ''}`;
+    const sources = React.useMemo(() => getSources(addons, kind, new Date(), types, genre), [addons, kind, types, genre]);
     const selected = React.useMemo(() => ({ request: { base: 'unified', path: { resource: 'catalog', type: types[0] || 'movie', id: kind, extra: genre ? [['genre', genre]] : [] } } }), [kind, genre, types]);
 
     React.useEffect(() => {
@@ -94,26 +95,47 @@ const useAggregatedDiscover = (core, raw, urlParams, queryParams, filters) => {
     React.useEffect(() => {
         if (!enabled || !active) return undefined;
         const controller = new AbortController();
-        // Retain a complete visible list during background refreshes. On first
-        // entry, publish each available page without waiting for slow providers.
-        const showProgress = resultRef.current?.key !== requestKey;
-        (async () => {
+        const pager = createCatalogPager(core, sources, controller.signal);
+        const metadata = new Map();
+        const previousSize = resultRef.current?.key === requestKey ? resultRef.current.items.length : 0;
+        const session = { loading: false, hasMore: true };
+        const cinemeta = addons.find((addon) => addon.manifest.id === 'com.linvo.cinemeta');
+        const run = async () => {
+            if (session.loading || !session.hasMore || controller.signal.aborted) return;
+            session.loading = true;
+            setResult((previous) => previous?.key === requestKey ? { ...previous, hasMore: false, loading: true } : previous);
             try {
-                const collected = await collectCatalogs(core, sources, controller.signal, undefined, (partial) => {
-                    if (showProgress && !controller.signal.aborted) {
-                        const items = mergeItems(partial.items.map((item) => normalizeItem(item, null)), kind);
-                        setResult({ key: requestKey, items, failed: partial.failed, missing: false });
-                    }
-                });
-                const cinemeta = addons.find((addon) => addon.manifest.id === 'com.linvo.cinemeta');
-                const enriched = await enrichItems(collected.items, cinemeta, controller.signal);
-                if (!controller.signal.aborted) setResult({ key: requestKey, items: mergeItems(enriched.items, kind), failed: collected.failed, missing: enriched.missing });
+                let page;
+                do {
+                    page = await pager.next();
+                    if (controller.signal.aborted) return;
+                    const canPublish = page.items.length >= previousSize || !page.hasMore;
+                    if (canPublish) setResult({ key: requestKey, items: mergeItems(page.items.map((item) => normalizeItem(item, metadata.get(metadataKey(item)))), kind), failed: page.failed, hasMore: false, loading: true });
+                    const uncached = page.items.filter((item) => !metadata.has(metadataKey(item)));
+                    const enriched = await enrichItems(uncached, cinemeta, controller.signal);
+                    if (controller.signal.aborted) return;
+                    for (const item of enriched.items) metadata.set(metadataKey(item), item);
+                    // Sample every selected source/type before pausing, and retain
+                    // the user's deeper list when refreshing watched/library state.
+                } while (page.hasMore && (page.priming || page.items.length < previousSize));
+                session.hasMore = page.hasMore;
+                setResult({ key: requestKey, items: mergeItems(page.items.map((item) => normalizeItem(item, metadata.get(metadataKey(item)))), kind), failed: page.failed, hasMore: page.hasMore, loading: false });
             } catch (_) {
-                if (!controller.signal.aborted) setResult({ key: requestKey, items: [], failed: sources.length });
-            }
-        })();
-        return () => controller.abort();
+                if (!controller.signal.aborted) {
+                    session.hasMore = false;
+                    setResult((previous) => ({ key: requestKey, items: previous?.key === requestKey ? previous.items : [], failed: sources.length, hasMore: false, loading: false }));
+                }
+            } finally { session.loading = false; }
+        };
+        session.loadNextPage = run;
+        sessionRef.current = session;
+        void run();
+        return () => {
+            controller.abort();
+            if (sessionRef.current === session) sessionRef.current = null;
+        };
     }, [enabled, active, core, addons, kind, sources, requestKey, revision]);
+    const loadNextPage = React.useCallback(() => { void sessionRef.current?.loadNextPage(); }, []);
 
     const current = result?.key === requestKey ? result : null;
     const movieCatalogs = React.useMemo(() => ['all', 'popular', 'latest'].map((id) => ({
@@ -132,14 +154,14 @@ const useAggregatedDiscover = (core, raw, urlParams, queryParams, filters) => {
     const aggregated = React.useMemo(() => ({
         ...raw,
         selected,
-        aggregate: { kind, types, failed: current?.failed || 0, missing: current?.missing || false, sources: sources.length, retry: refresh },
+        aggregate: { kind, types, failed: current?.failed || 0, missing: current?.missing || false, sources: sources.length, retry: refresh, loadNextPage, loading: current?.loading || false },
         selectable: {
             ...raw.selectable,
             types: ['movie', 'series'].map((type) => ({ type, selected: types.includes(type), deepLinks: { discover: filterHref({ types: [type], kind, genre }) } })),
-            catalogs: movieCatalogs, extra, nextPage: false,
+            catalogs: movieCatalogs, extra, nextPage: current?.hasMore === true,
         },
         catalog: { installed: true, content: current ? { type: 'Ready', content: visible } : { type: 'Loading' } },
-    }), [raw, selected, kind, types, genre, current, sources.length, movieCatalogs, extra, visible]);
+    }), [raw, selected, kind, types, genre, current, sources.length, movieCatalogs, extra, visible, loadNextPage]);
     return enabled ? aggregated : raw;
 };
 

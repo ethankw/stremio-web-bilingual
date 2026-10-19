@@ -20,8 +20,8 @@ test('all-selected preserves unknowns; active exclusions reject any co-productio
     expect(matchesCountries(['US', 'GB'], ['US'])).toBe(false);
     expect(matchesCountries(['US', 'GB'], ['GB'])).toBe(false);
     expect(matchesCountries(['GB', 'FR'], ['US'])).toBe(true);
-    expect(matchesCountries([], ['US'])).toBe(false);
-    expect(matchesCountries(null, ['US'])).toBe(false);
+    expect(matchesCountries([], ['US'])).toBe(true);
+    expect(matchesCountries(null, ['US'])).toBe(true);
     expect(matchesCountries(['JP'], COUNTRY_CODES)).toBe(false);
     expect(normalizeCountries(['US', 'GB', 'US', 'ZZ', null, '<script>'])).toEqual(['GB', 'US']);
 });
@@ -35,7 +35,7 @@ test('one switch excludes exactly the requested East/Southeast Asian countries a
     }
     expect(matchesCountries(['US', 'GB'], HIDDEN_COUNTRIES)).toBe(true);
     expect(matchesCountries(['US', 'GB', 'FR', 'DE', 'AU', 'NZ'], HIDDEN_COUNTRIES)).toBe(true);
-    expect(matchesCountries(null, HIDDEN_COUNTRIES)).toBe(false);
+    expect(matchesCountries(null, HIDDEN_COUNTRIES)).toBe(true);
 });
 
 test('country identity bridges IMDb and TMDB sources without inferring by title', () => {

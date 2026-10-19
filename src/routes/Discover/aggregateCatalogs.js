@@ -1,8 +1,5 @@
 // Copyright (C) 2017-2026 Smart code 203358507
 
-const SOURCE_LIMIT = 200;
-const MAX_PAGES = 10;
-const RESULT_LIMIT = 300;
 const PAGE_TIMEOUT = 12000;
 const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: false });
 
@@ -18,7 +15,7 @@ const catalogKind = (manifestId, catalog) => {
     return null;
 };
 
-const getSources = (addons, kind, now = new Date(), types = ['movie']) => {
+const getSources = (addons, kind, now = new Date(), types = ['movie'], genre = null) => {
     const sources = (addons || []).flatMap((addon) => (
         (addon.manifest.catalogs || []).flatMap((catalog) => {
             const sourceKind = catalogKind(addon.manifest.id, catalog);
@@ -29,10 +26,14 @@ const getSources = (addons, kind, now = new Date(), types = ['movie']) => {
             const years = addon.manifest.id === 'com.linvo.cinemeta' && catalog.id === 'year'
                 ? [String(now.getUTCFullYear()), String(now.getUTCFullYear() - 1)].filter((year) => extras.find((extra) => extra.name === 'genre')?.options?.includes(year))
                 : [null];
+            const genreSupported = genre && !(addon.manifest.id === 'com.linvo.cinemeta' && catalog.id === 'year')
+                && extras.some((extra) => extra.name === 'genre' && extra.options?.includes(genre));
+            const filteredExtras = genreSupported ? [...required.filter(([name]) => name !== 'genre'), ['genre', genre]] : required;
             return years.map((year) => ({
+                genre: genreSupported ? genre : null,
                 request: {
                     base: addon.transportUrl,
-                    path: { resource: 'catalog', type: catalog.type, id: catalog.id, extra: year === null ? required : [['genre', year]] },
+                    path: { resource: 'catalog', type: catalog.type, id: catalog.id, extra: year === null ? filteredExtras : [['genre', year]] },
                 },
                 cinemeta: addon.manifest.id === 'com.linvo.cinemeta',
                 paginated: extras.some((extra) => extra.name === 'skip'),
@@ -75,7 +76,7 @@ const normalizeItem = (item, canonical) => ({
     name: canonical?.name || item.name,
     released: canonical?.released || item.released,
     releaseInfo: canonical?.releaseInfo || item.releaseInfo,
-    aggregateGenres: canonical?.genres || (canonical?.links || item.links || []).filter((link) => link.category === 'Genres').map((link) => link.name),
+    aggregateGenres: [...new Set([...(canonical?.genres || item.genres || (canonical?.links || item.links || []).filter((link) => link.category === 'Genres').map((link) => link.name)), ...(item.aggregateFilterGenre ? [item.aggregateFilterGenre] : [])])],
     links: [...(item.links || []).filter((link) => link.category !== 'imdb'), ...(canonical?.links || []).filter((link) => link.category === 'imdb')],
     aggregateImdbId: imdbId(item),
 });
@@ -110,7 +111,7 @@ const mergeItems = (items, kind, now = Date.now()) => {
                 ? rating(b) - rating(a)
                 : (releaseDate(b) ?? -Infinity) - (releaseDate(a) ?? -Infinity);
             return (Number.isNaN(difference) ? 0 : difference) || collator.compare(a.name || '', b.name || '') || a.id.localeCompare(b.id);
-        }).slice(0, RESULT_LIMIT);
+        });
 };
 
 const sameRequest = (a, b) => a?.base === b?.base && a?.path?.id === b?.path?.id && a?.path?.type === b?.path?.type && JSON.stringify(a?.path?.extra) === JSON.stringify(b?.path?.extra);
@@ -186,40 +187,74 @@ const fetchCatalogPage = async (request, offset, signal) => {
     } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
 };
 
-const collectCatalogs = async (core, sources, signal, fetchPage = fetchCatalogPage, onProgress = null) => {
+// The first pass samples every source/media type. Subsequent calls continue one
+// source to exhaustion before switching, keeping Core's cumulative pagination.
+// Returning after each page bounds work without imposing a catalog-size limit.
+const createCatalogPager = (core, sources, signal, fetchPage = fetchCatalogPage) => {
+    const cursors = sources.map((source) => ({ source, offset: 0, ids: new Set(), pages: [], done: false }));
     const items = [];
     let failed = 0;
-    for (const source of sources) {
-        if (signal.aborted) throw new Error('cancelled');
-        let offset = 0;
-        let collectedIds = new Set();
-        const started = Date.now();
+    let primeIndex = 0;
+    let selectedCursor = null;
+    let running = false;
+    const snapshot = () => ({ items: [...items], failed, hasMore: cursors.some((cursor) => !cursor.done), priming: primeIndex < cursors.length });
+    const next = async () => {
+        if (running) throw new Error('catalog-page-in-flight');
+        running = true;
         try {
-            for (let page = 0; page < MAX_PAGES && offset < SOURCE_LIMIT; page++) {
-                if (Date.now() - started > 35000) { failed++; break; }
-                const raw = await fetchPage(source.request, offset, signal);
-                if (!raw.length) break;
-                const expected = [...new Set(raw.map((item) => item.id).filter((id) => typeof id === 'string' && !collectedIds.has(id)))];
-                if (!expected.length) break;
-                const state = await readCatalog(core, source.request, signal, page > 0 ? expected : null);
-                if (state.catalog.content.type === 'Err') {
-                    if (state.catalog.content.content !== 'EmptyContent') failed++;
-                    break;
+            while (cursors.some((cursor) => !cursor.done)) {
+                if (signal.aborted) throw new Error('cancelled');
+                const cursor = primeIndex < cursors.length ? cursors[primeIndex++] : cursors.find((entry) => !entry.done);
+                if (cursor.done) continue;
+                const { source } = cursor;
+                try {
+                    const raw = await fetchPage(source.request, cursor.offset, signal);
+                    if (signal.aborted) throw new Error('cancelled');
+                    const expected = [...new Set(raw.map((item) => item.id).filter((id) => typeof id === 'string' && !cursor.ids.has(id)))];
+                    if (!expected.length) { cursor.done = true; continue; }
+                    // Switching back after the first-page pass restores Core's
+                    // selection. Replayed pages are never appended a second time.
+                    if (cursor.offset && selectedCursor !== cursor) {
+                        await readCatalog(core, source.request, signal);
+                        for (const pageIds of cursor.pages.slice(1)) await readCatalog(core, source.request, signal, pageIds);
+                    }
+                    const state = await readCatalog(core, source.request, signal, cursor.offset ? expected : null);
+                    selectedCursor = cursor;
+                    if (state.catalog.content.type === 'Err') {
+                        if (state.catalog.content.content !== 'EmptyContent') failed++;
+                        cursor.done = true;
+                        continue;
+                    }
+                    const batch = state.catalog.content.content;
+                    const added = batch.filter((item) => !cursor.ids.has(item.id));
+                    if (!added.length) { cursor.done = true; continue; }
+                    items.push(...added.map((item) => ({ ...item, aggregateCinemeta: source.cinemeta, aggregateSource: source.request.base, aggregateFilterGenre: source.genre })));
+                    cursor.pages.push(expected);
+                    cursor.ids = new Set(batch.map((item) => item.id));
+                    cursor.offset += raw.length;
+                    if (!source.paginated) cursor.done = true;
+                    return snapshot();
+                } catch (error) {
+                    if (signal.aborted) throw error;
+                    selectedCursor = null;
+                    cursor.done = true;
+                    failed++;
                 }
-                const batch = state.catalog.content.content;
-                const next = batch.filter((item) => !collectedIds.has(item.id));
-                items.push(...next.slice(0, SOURCE_LIMIT - collectedIds.size).map((item) => ({ ...item, aggregateCinemeta: source.cinemeta, aggregateSource: source.request.base })));
-                if (!signal.aborted) onProgress?.({ items: [...items], failed });
-                collectedIds = new Set(batch.map((item) => item.id));
-                offset += raw.length;
-                if (!source.paginated) break;
             }
-        } catch (error) {
-            if (signal.aborted) throw error;
-            failed++;
-        }
-    }
-    return { items, failed };
+            return snapshot();
+        } finally { running = false; }
+    };
+    return { next };
 };
 
-module.exports = { SOURCE_LIMIT, RESULT_LIMIT, catalogKind, getSources, imdbId, releaseDate, normalizeItem, mergeItems, collectCatalogs, readCatalog, fetchCatalogPage };
+const collectCatalogs = async (core, sources, signal, fetchPage = fetchCatalogPage, onProgress = null) => {
+    const pager = createCatalogPager(core, sources, signal, fetchPage);
+    let result;
+    do {
+        result = await pager.next();
+        await onProgress?.(result);
+    } while (result.hasMore);
+    return result;
+};
+
+module.exports = { catalogKind, getSources, imdbId, releaseDate, normalizeItem, mergeItems, collectCatalogs, createCatalogPager, readCatalog, fetchCatalogPage };

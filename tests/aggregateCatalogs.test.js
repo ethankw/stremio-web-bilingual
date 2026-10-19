@@ -103,8 +103,8 @@ test('collects pagination before sorting, isolates source failures, preserves wa
     expect(result.items).toHaveLength(40);
     expect(result.failed).toBe(1);
     expect(result.items[0].watched).toBe(true);
-    expect(core.transport.dispatch.mock.calls[1][0]).toEqual({ action: 'CatalogWithFilters', args: { action: 'LoadNextPage' } });
-    expect(core.fetchPage.mock.calls[1][1]).toBe(20);
+    expect(core.transport.dispatch).toHaveBeenCalledWith({ action: 'CatalogWithFilters', args: { action: 'LoadNextPage' } }, 'discover');
+    expect(core.fetchPage).toHaveBeenCalledWith(expect.objectContaining({ path: expect.objectContaining({ id: 'good' }) }), 20, expect.anything());
     expect(core.listeners.size).toBe(0);
     const repeating = fakeCore(() => ({ type: 'Ready', content: [movie('tt0000001', 'Repeated')] }));
     expect((await collectCatalogs(repeating, [source('repeat', true)], new AbortController().signal, repeating.fetchPage)).items).toHaveLength(1);
@@ -198,4 +198,44 @@ test('series pagination uses the series endpoint, not a movie request with a ser
         await fetchCatalogPage({ base: 'https://fixture.example/manifest.json', path: { type: 'series', id: 'top', extra: [] } }, 0, new AbortController().signal);
         expect(global.fetch.mock.calls[0][0].pathname).toBe('/catalog/series/top.json');
     } finally { global.fetch = original; }
+});
+
+
+test('genre is pushed to supported catalogs without confusing Cinemeta year with genre', () => {
+    const addons = [addon('com.linvo.cinemeta', [
+        catalog('top', 'Popular', [{ name: 'genre', options: ['Horror', 'Drama'] }, { name: 'skip' }]),
+        catalog('year', 'New', [{ name: 'genre', isRequired: true, options: ['2026', '2025'] }]),
+    ])];
+    const sources = getSources(addons, 'all', new Date('2026-10-19'), ['movie'], 'Horror');
+    expect(sources[0]).toMatchObject({ genre: 'Horror', request: { path: { extra: [['genre', 'Horror']] } } });
+    expect(sources[1].request.path.extra).toEqual([['genre', '2026']]);
+    expect(sources[1].genre).toBeNull();
+    expect(normalizeItem(movie('tt0000001', 'Missing genre', { aggregateFilterGenre: 'Horror' }), null).aggregateGenres).toContain('Horror');
+});
+
+test('more than 300 matching items and more than ten pages remain reachable without a raised hard cap', async () => {
+    const core = fakeCore((id, offset) => ({ type: 'Ready', content: offset < 650 ? Array.from({ length: 50 }, (_, i) => movie(`tt${String(offset + i).padStart(7, '0')}`, `Film ${offset + i}`, { watched: offset < 300 })) : [] }));
+    const result = await collectCatalogs(core, [source('all-history', true)], new AbortController().signal, core.fetchPage);
+    expect(result.items).toHaveLength(650);
+    expect(mergeItems(result.items, 'all')).toHaveLength(650);
+    expect(result.items.filter((item) => !item.watched)).toHaveLength(350);
+    expect(core.fetchPage.mock.calls.map((call) => call[1])).toContain(600);
+    expect(result.hasMore).toBe(false);
+});
+
+test('pager samples each source, pauses between requests and resumes past filtered pages without losing Core state', async () => {
+    const { createCatalogPager } = require('../src/routes/Discover/aggregateCatalogs');
+    const core = fakeCore((id, offset) => ({ type: 'Ready', content: offset < 60 ? Array.from({ length: 20 }, (_, i) => movie(`tt${String((id === 'first' ? 0 : 1000) + offset + i).padStart(7, '0')}`, id, { watched: offset < 40 })) : [] }));
+    const pager = createCatalogPager(core, [source('first', true), source('second', true)], new AbortController().signal, core.fetchPage);
+    expect((await pager.next()).items).toHaveLength(20);
+    expect(core.fetchPage).toHaveBeenCalledTimes(1);
+    const sampled = await pager.next();
+    expect(sampled.items).toHaveLength(40);
+    expect(sampled.priming).toBe(false);
+    expect(sampled.hasMore).toBe(true);
+    await pager.next();
+    const continued = await pager.next();
+    expect(continued.items.filter((item) => !item.watched)).toHaveLength(20);
+    expect(new Set(continued.items.map((item) => item.id)).size).toBe(continued.items.length);
+    expect(core.listeners.size).toBe(0);
 });
