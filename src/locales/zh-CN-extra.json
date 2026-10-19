@@ -107,5 +107,10 @@
     "DISCOVER_LATEST": "最新",
     "DISCOVER_NO_MOVIES": "没有找到电影。",
     "COUNTRIES_LABEL": "国别",
-    "DISCOVER_HIDE_EAST_ASIAN_INDIAN": "隐藏中日韩印及东南亚"
+    "DISCOVER_HIDE_EAST_ASIAN_INDIAN": "隐藏中日韩印及东南亚",
+    "Action & Adventure": "动作与冒险",
+    "Sci-Fi & Fantasy": "科幻与奇幻",
+    "War & Politics": "战争与政治",
+    "Soap": "肥皂剧",
+    "Talk": "访谈"
 }
