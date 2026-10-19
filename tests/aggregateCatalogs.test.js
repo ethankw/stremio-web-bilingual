@@ -168,3 +168,34 @@ test('publishes sorted usable pages before a later provider completes', async ()
     expect(progress.mock.calls[0][0].items).toHaveLength(1); // snapshots cannot mutate later
     expect(core.listeners.size).toBe(0);
 });
+
+test('all combines popular and latest for both types and schedules the first series source early', () => {
+    const catalogs = ['movie', 'series'].flatMap((type) => [
+        { ...catalog('top', 'Popular'), type },
+        { ...catalog('year', 'New', [{ name: 'genre', options: ['2026', '2025'] }]), type },
+    ]);
+    const addons = [addon('com.linvo.cinemeta', catalogs)];
+    const sources = getSources(addons, 'all', new Date('2026-10-19'), ['movie', 'series']);
+    expect(sources).toHaveLength(6);
+    expect(sources.slice(0, 2).map((source) => [source.request.path.type, source.request.path.id])).toEqual([['movie', 'top'], ['series', 'top']]);
+    expect(getSources(addons, 'popular', new Date(), ['series']).map((source) => source.request.path.type)).toEqual(['series']);
+    expect(getSources(addons, 'all', new Date(), [])).toEqual([]);
+});
+
+test('mixed catalogs deduplicate inside each type, and all sorts by IMDb rather than release date', () => {
+    const film = movie('tt0000001', 'Film', { imdbRating: '8.5', released: '2026-10-10' });
+    const series = movie('tt0000001', 'Series', { type: 'series', imdbRating: '9.0', released: '2020-01-01' });
+    const other = movie('tt0000002', 'Other', { type: 'series', imdbRating: '8.5', released: '2026-10-11' });
+    expect(mergeItems([film, series, { ...series, watched: true }, other], 'all').map((item) => [item.type, item.name])).toEqual([['series', 'Series'], ['movie', 'Film'], ['series', 'Other']]);
+    expect(mergeItems([film, series, other], 'latest').map((item) => item.name)).toEqual(['Other', 'Film', 'Series']);
+});
+
+test('series pagination uses the series endpoint, not a movie request with a series ID', async () => {
+    const { fetchCatalogPage } = require('../src/routes/Discover/aggregateCatalogs');
+    const original = global.fetch;
+    global.fetch = jest.fn(async () => ({ ok: true, text: async () => JSON.stringify({ metas: [{ id: 'tt0944947', type: 'series' }] }) }));
+    try {
+        await fetchCatalogPage({ base: 'https://fixture.example/manifest.json', path: { type: 'series', id: 'top', extra: [] } }, 0, new AbortController().signal);
+        expect(global.fetch.mock.calls[0][0].pathname).toBe('/catalog/series/top.json');
+    } finally { global.fetch = original; }
+});

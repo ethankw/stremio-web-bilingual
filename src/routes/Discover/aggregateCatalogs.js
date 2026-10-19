@@ -7,7 +7,7 @@ const PAGE_TIMEOUT = 12000;
 const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: false });
 
 const catalogKind = (manifestId, catalog) => {
-    if (catalog.type !== 'movie') return null;
+    if (!['movie', 'series'].includes(catalog.type)) return null;
     if (manifestId === 'com.linvo.cinemeta') return { top: 'popular', year: 'latest' }[catalog.id] || null;
     if (manifestId === 'tmdb-addon') return { 'tmdb.top': 'popular', 'tmdb.latest': 'latest' }[catalog.id] || null;
     // Only explicit release/new catalogs qualify. History, recently watched,
@@ -18,25 +18,31 @@ const catalogKind = (manifestId, catalog) => {
     return null;
 };
 
-const getSources = (addons, kind, now = new Date()) => (addons || []).flatMap((addon) => (
-    (addon.manifest.catalogs || []).flatMap((catalog) => {
-        if (catalogKind(addon.manifest.id, catalog) !== kind) return [];
-        const extras = catalog.extra || [];
-        if (extras.some((extra) => extra.isRequired && (!extra.options?.length || ['search', 'ids'].includes(extra.name)))) return [];
-        const required = extras.filter((extra) => extra.isRequired).map((extra) => [extra.name, extra.options[0]]);
-        const years = addon.manifest.id === 'com.linvo.cinemeta' && catalog.id === 'year'
-            ? [String(now.getUTCFullYear()), String(now.getUTCFullYear() - 1)].filter((year) => extras.find((extra) => extra.name === 'genre')?.options?.includes(year))
-            : [null];
-        return years.map((year) => ({
-            request: {
-                base: addon.transportUrl,
-                path: { resource: 'catalog', type: 'movie', id: catalog.id, extra: year === null ? required : [['genre', year]] },
-            },
-            cinemeta: addon.manifest.id === 'com.linvo.cinemeta',
-            paginated: extras.some((extra) => extra.name === 'skip'),
-        }));
-    })
-));
+const getSources = (addons, kind, now = new Date(), types = ['movie']) => {
+    const sources = (addons || []).flatMap((addon) => (
+        (addon.manifest.catalogs || []).flatMap((catalog) => {
+            const sourceKind = catalogKind(addon.manifest.id, catalog);
+            if (!types.includes(catalog.type) || !sourceKind || (kind !== 'all' && sourceKind !== kind)) return [];
+            const extras = catalog.extra || [];
+            if (extras.some((extra) => extra.isRequired && (!extra.options?.length || ['search', 'ids'].includes(extra.name)))) return [];
+            const required = extras.filter((extra) => extra.isRequired).map((extra) => [extra.name, extra.options[0]]);
+            const years = addon.manifest.id === 'com.linvo.cinemeta' && catalog.id === 'year'
+                ? [String(now.getUTCFullYear()), String(now.getUTCFullYear() - 1)].filter((year) => extras.find((extra) => extra.name === 'genre')?.options?.includes(year))
+                : [null];
+            return years.map((year) => ({
+                request: {
+                    base: addon.transportUrl,
+                    path: { resource: 'catalog', type: catalog.type, id: catalog.id, extra: year === null ? required : [['genre', year]] },
+                },
+                cinemeta: addon.manifest.id === 'com.linvo.cinemeta',
+                paginated: extras.some((extra) => extra.name === 'skip'),
+            }));
+        })
+    ));
+    // Give each selected media type an early source before slower providers.
+    const groups = types.map((type) => sources.filter((source) => source.request.path.type === type));
+    return Array.from({ length: Math.max(0, ...groups.map((group) => group.length)) }, (_, index) => groups.flatMap((group) => group[index] ? [group[index]] : [])).flat();
+};
 
 const imdbId = (item) => {
     if (/^tt\d{7,10}$/.test(item.id)) return item.id;
@@ -77,8 +83,8 @@ const normalizeItem = (item, canonical) => ({
 const mergeItems = (items, kind, now = Date.now()) => {
     const unique = new Map();
     for (const item of items) {
-        if (item.type !== 'movie' || typeof item.id !== 'string' || item.id === 'tmdb:no-content') continue;
-        const key = item.aggregateImdbId || imdbId(item) || (/^tmdb:[1-9]\d*$/.test(item.id) ? item.id : `${item.aggregateSource || ''}|${item.id}`);
+        if (!['movie', 'series'].includes(item.type) || typeof item.id !== 'string' || item.id === 'tmdb:no-content') continue;
+        const key = `${item.type}|${item.aggregateImdbId || imdbId(item) || (/^tmdb:[1-9]\d*$/.test(item.id) ? item.id : `${item.aggregateSource || ''}|${item.id}`)}`;
         const previous = unique.get(key);
         if (!previous) unique.set(key, item);
         else {
@@ -100,7 +106,7 @@ const mergeItems = (items, kind, now = Date.now()) => {
     return [...unique.values()]
         .filter((item) => kind !== 'latest' || releaseDate(item) === null || releaseDate(item) <= now)
         .sort((a, b) => {
-            const difference = kind === 'popular'
+            const difference = kind !== 'latest'
                 ? rating(b) - rating(a)
                 : (releaseDate(b) ?? -Infinity) - (releaseDate(a) ?? -Infinity);
             return (Number.isNaN(difference) ? 0 : difference) || collator.compare(a.name || '', b.name || '') || a.id.localeCompare(b.id);
@@ -158,9 +164,11 @@ const readCatalog = (core, request, signal, expectedIds = null) => new Promise((
 const fetchCatalogPage = async (request, offset, signal) => {
     const url = new URL(request.base);
     if (!['https:', 'http:'].includes(url.protocol) || !url.pathname.endsWith('/manifest.json')) throw new Error('unsupported-catalog');
+    const type = request.path.type || 'movie';
+    if (!['movie', 'series'].includes(type)) throw new Error('unsupported-catalog');
     const extras = [...request.path.extra, ...(offset ? [['skip', String(offset)]] : [])];
     const suffix = extras.length ? '/' + extras.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&') : '';
-    url.pathname = url.pathname.slice(0, -'manifest.json'.length) + `catalog/movie/${encodeURIComponent(request.path.id)}${suffix}.json`;
+    url.pathname = url.pathname.slice(0, -'manifest.json'.length) + `catalog/${type}/${encodeURIComponent(request.path.id)}${suffix}.json`;
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal.addEventListener('abort', abort, { once: true });
