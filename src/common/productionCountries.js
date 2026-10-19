@@ -9,7 +9,9 @@ const eastAsian = ['CN', 'HK', 'MO', 'TW', 'JP', 'KR', 'KP'];
 const normalizeCountries = (value) => Array.isArray(value)
     ? [...new Set(value.filter((code) => typeof code === 'string' && codes.has(code)))].sort()
     : [];
+const historicalChinese = { XC: '捷克斯洛伐克', XG: '东德', XI: '北爱尔兰' };
 const countryName = (code, locale = 'en-US') => {
+    if (locale.startsWith('zh') && historicalChinese[code]) return historicalChinese[code];
     try {
         const name = new Intl.DisplayNames([locale], { type: 'region', style: locale.startsWith('zh') ? 'short' : 'long' }).of(code);
         return name && name !== code ? name : countryNames[code] || code;

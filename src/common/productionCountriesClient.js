@@ -34,6 +34,7 @@ const createCountryClient = (fetcher = (...args) => fetch(...args), clock = Date
                 if (result.schemaVersion !== 1 || result.identity?.stremioType !== identity.type || result.identity?.stremioId !== identity.id || !['matched', 'unmatched', 'ambiguous', 'unsupported'].includes(result.matchStatus) || !Array.isArray(result.productionCountries) || result.productionCountries.length > 50 || result.productionCountries.some((code) => typeof code !== 'string' || !/^[A-Z]{2}$/.test(code))) return null;
                 const matched = result.matchStatus === 'matched';
                 if (matched ? !Number.isSafeInteger(result.identity.tmdbId) || result.identity.tmdbId <= 0 : result.identity.tmdbId !== null || result.productionCountries.length !== 0) return null;
+                if (identity.id.startsWith('tmdb:') && result.identity.tmdbId !== null && result.identity.tmdbId !== Number(identity.id.slice(5))) return null;
                 const value = normalizeCountries(result.productionCountries);
                 seed(identity, value, matched ? 24 * 60 * 60 * 1000 : 30 * 60 * 1000);
                 return value;

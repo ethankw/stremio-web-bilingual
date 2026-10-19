@@ -16,6 +16,8 @@ test('country snapshot is complete, unique, and partitioned exactly once into th
     expect(groups[2].codes[0]).toBe('IN');
     expect(countryName('US', 'zh-CN')).toBe('美国');
     expect(countryName('JP', 'en-US')).toBe('Japan');
+    expect(countryName('US', 'en-US')).toBe('United States');
+    expect(countryName('XC', 'zh-CN')).toBe('捷克斯洛伐克');
 });
 
 test('all-selected preserves unknowns; active exclusions reject any co-production containing an excluded country', () => {
