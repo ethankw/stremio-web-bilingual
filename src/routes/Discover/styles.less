@@ -4,6 +4,9 @@
 @import (reference) '~stremio/common/screen-sizes.less';
 
 .watched-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
     padding: 0.5rem 1.5rem 0.75rem;
 }
 
@@ -592,55 +595,4 @@
         outline: var(--focus-outline-size) solid var(--primary-foreground-color);
         outline-offset: 2px;
     }
-}
-
-.country-filters {
-    flex: none;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-    padding: 0 1.5rem 1.25rem;
-}
-.country-group {
-    min-width: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    legend { margin-bottom: 0.6rem; color: var(--primary-foreground-color); opacity: 0.65; font-size: 0.9rem; }
-}
-.country-options {
-    display: flex;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    gap: 0.4rem;
-    max-height: 10rem;
-    overflow-y: auto;
-    padding: 0.2rem;
-    &:focus-visible { outline: 2px solid var(--primary-foreground-color); outline-offset: 2px; }
-}
-.country-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    min-height: 2rem;
-    padding: 0.3rem 0.65rem;
-    border: 1px solid transparent;
-    border-radius: 2rem;
-    background: var(--overlay-color);
-    color: var(--primary-foreground-color);
-    font: inherit;
-    font-size: 0.85rem;
-    cursor: pointer;
-    span { width: 1em; }
-    &[aria-checked='true'] { background: var(--secondary-accent-color); }
-    &[aria-checked='false'] { opacity: 0.55; }
-    &:hover { border-color: var(--primary-foreground-color); }
-    &:focus-visible { outline: 2px solid var(--primary-foreground-color); outline-offset: 2px; }
-}
-@media (max-width: 600px) {
-    .country-filters { gap: 0.5rem; }
-    .country-group legend { min-height: 2.5rem; font-size: 0.8rem; }
-    .country-options { max-height: 8rem; }
-    .country-chip { max-width: 100%; padding: 0.3rem 0.5rem; font-size: 0.8rem; text-align: start; overflow-wrap: anywhere; }
-    .country-chip span { flex-shrink: 0; }
 }

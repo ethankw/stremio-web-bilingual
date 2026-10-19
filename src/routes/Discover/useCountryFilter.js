@@ -1,28 +1,17 @@
 // Copyright (C) 2026 Ethan. GPL-2.0 license retained.
 const React = require('react');
-const { normalizeCountries, matchesCountries, countryIdentity } = require('stremio/common/productionCountries');
+const { HIDDEN_COUNTRIES, matchesCountries, countryIdentity } = require('stremio/common/productionCountries');
 const { countryClient } = require('stremio/common/productionCountriesClient');
-const STORAGE_KEY = 'stremio-discover-excluded-countries-v1';
-const readExcluded = () => {
-    try { return normalizeCountries(JSON.parse(window.localStorage.getItem(STORAGE_KEY))); }
-    catch (_) { return []; }
-};
+const useSavedBoolean = require('stremio/common/useSavedBoolean');
+const NO_EXCLUSIONS = [];
 const useCountryFilter = (items, active) => {
-    const [excluded, setExcluded] = React.useState(readExcluded);
+    const [enabled, setEnabled] = useSavedBoolean('stremio-discover-hide-east-asian-indian-v1');
+    const excluded = enabled ? HIDDEN_COUNTRIES : NO_EXCLUSIONS;
     const [resolved, setResolved] = React.useState({});
-    const excludedKey = JSON.stringify(excluded);
     const identitiesKey = JSON.stringify([...new Map(items.map((item) => {
         const identity = countryIdentity(item);
         return [`${identity.type}|${identity.id}`, identity];
     })).values()]);
-    React.useEffect(() => {
-        try { window.localStorage.setItem(STORAGE_KEY, excludedKey); } catch (_) { /* Keep the current session usable if storage is unavailable. */ }
-    }, [excludedKey]);
-    React.useEffect(() => {
-        const onStorage = (event) => { if (event.key === STORAGE_KEY || event.key === null) setExcluded(readExcluded()); };
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
-    }, []);
     React.useEffect(() => {
         if (!active || excluded.length === 0) return undefined;
         let cancelled = false;
@@ -43,7 +32,7 @@ const useCountryFilter = (items, active) => {
         const identity = countryIdentity(item);
         return matchesCountries(resolved[`${identity.type}|${identity.id}`], excluded);
     }), [items, resolved, excluded]);
-    const toggle = React.useCallback((code) => setExcluded((previous) => normalizeCountries(previous.includes(code) ? previous.filter((value) => value !== code) : [...previous, code])), []);
-    return { items: filtered, excluded, toggle };
+    const toggle = React.useCallback(() => setEnabled((previous) => !previous), [setEnabled]);
+    return { items: filtered, enabled, toggle };
 };
 module.exports = useCountryFilter;

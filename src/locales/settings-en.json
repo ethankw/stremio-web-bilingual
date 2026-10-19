@@ -83,7 +83,5 @@
     "DISCOVER_LATEST": "Latest",
     "DISCOVER_NO_MOVIES": "No movies found.",
     "COUNTRIES_LABEL": "Production countries",
-    "COUNTRIES_GROUP_western": "Europe & the Americas",
-    "COUNTRIES_GROUP_eastAsian": "China, Japan & Korea",
-    "COUNTRIES_GROUP_other": "Other countries & regions"
+    "DISCOVER_HIDE_EAST_ASIAN_INDIAN": "Hide China, Japan, Korea, India & Southeast Asia"
 }
