@@ -19,7 +19,7 @@ const countryName = (code, locale = 'en-US') => {
 // Fail closed while filtering: missing/unresolved data cannot establish that a
 // co-production excludes a deselected country. All-selected never needs metadata.
 const matchesCountries = (countries, excluded) => excluded.length === 0 || (
-    Array.isArray(countries) && countries.length > 0 && countries.every((code) => !excluded.includes(code))
+    !Array.isArray(countries) || countries.length === 0 || countries.every((code) => !excluded.includes(code))
 );
 const countryIdentity = (item) => ({ type: item.type, id: item.aggregateImdbId || item.id });
 

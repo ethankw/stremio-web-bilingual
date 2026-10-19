@@ -101,7 +101,6 @@ const Discover = () => {
         }
     }, [hideWatched, discover.catalog, selectedMetaItemIndex, setSelectedMetaItemIndex]);
     const metaPreviewRef = React.useRef();
-    const previousCatalogSizeRef = React.useRef(0);
 
     const [selectedEpgProgram, setSelectedEpgProgram] = React.useState(null);
     const [epgPreviewOpen, openEpgPreview, closeEpgPreviewModal] = useBinaryState(false);
@@ -123,25 +122,20 @@ const Discover = () => {
     React.useEffect(() => {
         if (!isEpgLayout && discover.catalog?.content.type === 'Loading' && metasContainerRef.current) {
             metasContainerRef.current.scrollTop = 0;
-            previousCatalogSizeRef.current = 0;
         }
     }, [discover.catalog, isEpgLayout]);
     React.useEffect(() => {
-        if (!isEpgLayout && discover.catalog?.content.type === 'Ready') {
-            const catalogSize = discover.catalog.content.content.length;
-            const hasNewItems = catalogSize > previousCatalogSizeRef.current;
-            previousCatalogSizeRef.current = catalogSize;
-            if (hideWatched || !hasNextPage || !hasNewItems || !metasContainerRef.current) {
-                return;
-            }
-
-            const containerHeight = metasContainerRef.current.scrollHeight;
-            const viewportHeight = metasContainerRef.current.clientHeight;
-            if (containerHeight <= viewportHeight + SCROLL_TO_BOTTOM_THRESHOLD) {
-                loadNextPage();
-            }
-        }
-    }, [discover.catalog, isEpgLayout, hasNextPage, loadNextPage, hideWatched]);
+        if (isEpgLayout || discover.catalog?.content.type !== 'Ready' || !hasNextPage) return undefined;
+        // Measure after watched-card collapse. Filtered-out pages must not leave
+        // an empty viewport with no way to trigger the next scroll event.
+        const timer = setTimeout(() => {
+            const container = metasContainerRef.current;
+            if (!container || !routeActive) return;
+            const visibleCount = discover.catalog.content.content.filter((item) => !hideWatched || item.watched !== true).length;
+            if (visibleCount === 0 || container.scrollHeight <= container.clientHeight + SCROLL_TO_BOTTOM_THRESHOLD) loadNextPage();
+        }, 320);
+        return () => clearTimeout(timer);
+    }, [discover.catalog, isEpgLayout, hasNextPage, loadNextPage, hideWatched, routeActive]);
     const addToLibrary = React.useCallback(() => {
         if (selectedMetaItem === null) {
             return;
