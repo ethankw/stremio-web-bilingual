@@ -1,19 +1,13 @@
-const { COUNTRY_CODES, countryGroups, countryName, normalizeCountries, matchesCountries, countryIdentity } = require('../src/common/productionCountries');
+const { COUNTRY_CODES, HIDDEN_COUNTRIES, countryName, normalizeCountries, matchesCountries, countryIdentity } = require('../src/common/productionCountries');
 const { createCountryClient } = require('../src/common/productionCountriesClient');
 
 const identity = { type: 'movie', id: 'tt0133093' };
 const payload = (countries = ['US', 'AU']) => ({ schemaVersion: 1, identity: { stremioType: identity.type, stremioId: identity.id, tmdbId: 603 }, matchStatus: 'matched', productionCountries: countries });
 const response = (body) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
 
-test('country snapshot is complete, unique, and partitioned exactly once into the requested three sections', () => {
+test('country snapshot preserves localized names for details independently of the simplified filter', () => {
     expect(COUNTRY_CODES.length).toBeGreaterThan(240);
     expect(new Set(COUNTRY_CODES).size).toBe(COUNTRY_CODES.length);
-    const groups = countryGroups('zh-CN');
-    expect(groups.map((group) => group.id)).toEqual(['western', 'eastAsian', 'other']);
-    expect(groups.flatMap((group) => group.codes).sort()).toEqual([...COUNTRY_CODES].sort());
-    expect(groups[0].codes.slice(0, 2)).toEqual(['US', 'GB']);
-    expect(groups[1].codes).toEqual(expect.arrayContaining(['CN', 'HK', 'MO', 'TW', 'JP', 'KR']));
-    expect(groups[2].codes[0]).toBe('IN');
     expect(countryName('US', 'zh-CN')).toBe('美国');
     expect(countryName('JP', 'en-US')).toBe('Japan');
     expect(countryName('US', 'en-US')).toBe('United States');
@@ -30,6 +24,18 @@ test('all-selected preserves unknowns; active exclusions reject any co-productio
     expect(matchesCountries(null, ['US'])).toBe(false);
     expect(matchesCountries(['JP'], COUNTRY_CODES)).toBe(false);
     expect(normalizeCountries(['US', 'GB', 'US', 'ZZ', null, '<script>'])).toEqual(['GB', 'US']);
+});
+
+test('one switch excludes exactly the requested East/Southeast Asian countries and India, including co-productions', () => {
+    expect(HIDDEN_COUNTRIES).toEqual(['CN', 'HK', 'MO', 'TW', 'JP', 'KR', 'KP', 'IN', 'BN', 'KH', 'ID', 'LA', 'MY', 'MM', 'PH', 'SG', 'TH', 'TL', 'VN']);
+    for (const code of HIDDEN_COUNTRIES) {
+        expect(matchesCountries([code], HIDDEN_COUNTRIES)).toBe(false);
+        expect(matchesCountries(['US', code], HIDDEN_COUNTRIES)).toBe(false);
+        expect(matchesCountries(['US', code], [])).toBe(true);
+    }
+    expect(matchesCountries(['US', 'GB'], HIDDEN_COUNTRIES)).toBe(true);
+    expect(matchesCountries(['US', 'GB', 'FR', 'DE', 'AU', 'NZ'], HIDDEN_COUNTRIES)).toBe(true);
+    expect(matchesCountries(null, HIDDEN_COUNTRIES)).toBe(false);
 });
 
 test('country identity bridges IMDb and TMDB sources without inferring by title', () => {

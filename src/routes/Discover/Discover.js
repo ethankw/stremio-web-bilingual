@@ -24,7 +24,6 @@ const { default: Guide } = require('./Guide');
 const { default: DaySelector } = require('./Guide/DaySelector');
 const { default: useLiveTvGuide } = require('./useLiveTvGuide');
 const styles = require('./styles');
-const CountryFilters = require('./CountryFilters');
 const useCountryFilter = require('./useCountryFilter');
 const useSavedBoolean = require('stremio/common/useSavedBoolean');
 
@@ -449,8 +448,11 @@ const Discover = () => {
                             >{option.label}</button>
                         ))}
                     </div>}
-                    {discover.aggregate && <CountryFilters excluded={countryFilter.excluded} toggle={countryFilter.toggle} />}
                     {!isEpgLayout && <div className={styles['watched-controls']}>
+                        {discover.aggregate && <button type={'button'} role={'switch'} data-country-filter={true} aria-checked={countryFilter.enabled} className={styles['watched-switch']} onClick={countryFilter.toggle}>
+                            <span className={styles['watched-switch-track']} aria-hidden={true}><span /></span>
+                            {t('DISCOVER_HIDE_EAST_ASIAN_INDIAN')}
+                        </button>}
                         <button type={'button'} role={'switch'} aria-checked={hideWatched} className={styles['watched-switch']} onClick={toggleHideWatched}>
                             <span className={styles['watched-switch-track']} aria-hidden={true}><span /></span>
                             {t('DISCOVER_HIDE_WATCHED', { defaultValue: '隐藏已观看' })}
