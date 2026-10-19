@@ -43,6 +43,7 @@ export type BilingualMetadata = {
         zh: LocalizedText;
     };
     artwork?: EnglishArtwork;
+    productionCountries?: string[];
     fetchedAt: string;
     scope: MetadataScope;
     season?: number;
@@ -74,3 +75,5 @@ export type PeopleMetadata = {
     displayLocale: 'en-US';
     people: { id: number; displayName: string; names: string[]; role: 'cast' | 'director'; image: string | null }[];
 };
+
+export type CountryMetadata = Pick<BilingualMetadata, 'schemaVersion' | 'identity' | 'matchStatus'> & { productionCountries: string[] };

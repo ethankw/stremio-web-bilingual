@@ -81,5 +81,9 @@
     "SETTINGS_ENABLED": "Enabled",
     "DISCOVER_POPULAR": "Popular",
     "DISCOVER_LATEST": "Latest",
-    "DISCOVER_NO_MOVIES": "No movies found."
+    "DISCOVER_NO_MOVIES": "No movies found.",
+    "COUNTRIES_LABEL": "Production countries",
+    "COUNTRIES_GROUP_western": "Europe & the Americas",
+    "COUNTRIES_GROUP_eastAsian": "China, Japan & Korea",
+    "COUNTRIES_GROUP_other": "Other countries & regions"
 }

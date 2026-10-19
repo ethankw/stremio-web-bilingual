@@ -266,6 +266,7 @@ describe('bilingual metadata matching and protocol', () => {
                 zh: expect.objectContaining({ text: '中文简介。', evidence: 'translation-exact' }),
             },
             artwork: { policy: 'english-v1', poster: null, logo: null, background: null },
+            productionCountries: [],
             fetchedAt: '2026-10-14T00:00:00.000Z',
             scope: 'meta',
         });
