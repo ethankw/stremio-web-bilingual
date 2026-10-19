@@ -4,7 +4,7 @@
 const DEFAULT_LOCALE = 'zh-CN';
 const ENGLISH_LOCALE = 'en-US';
 const CACHE_SCHEMA_VERSION = 1;
-const MATCH_ALGORITHM_VERSION = 'english-presentation-v3';
+const MATCH_ALGORITHM_VERSION = 'production-countries-v4';
 const SUCCESS_TTL = 24 * 60 * 60 * 1000;
 const UNMATCHED_TTL = 30 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 512;
@@ -155,6 +155,8 @@ const validateMetadata = (metadata, identity) => {
     if (!isRecord(metadata) || metadata.schemaVersion !== 1 || !isRecord(metadata.identity) || metadata.identity.stremioType !== identity.type || metadata.identity.stremioId !== identity.id || (metadata.identity.scope !== undefined && metadata.identity.scope !== identity.scope) || !SUPPORTED_MATCH_STATUSES.has(metadata.matchStatus) || !isRecord(metadata.title) || !isRecord(metadata.overview) || !validateLocalizedText(metadata.title.en, ENGLISH_LOCALE, { allowEnglishOriginal: true }) || !validateLocalizedText(metadata.title.zh, DEFAULT_LOCALE) || !validateLocalizedText(metadata.overview.en, ENGLISH_LOCALE) || !validateLocalizedText(metadata.overview.zh, DEFAULT_LOCALE) || typeof metadata.fetchedAt !== 'string' || !Number.isFinite(Date.parse(metadata.fetchedAt)) || metadata.scope !== identity.scope) {
         return false;
     }
+
+    if (metadata.productionCountries !== undefined && (!Array.isArray(metadata.productionCountries) || metadata.productionCountries.length > 50 || metadata.productionCountries.some((code) => typeof code !== 'string' || !/^[A-Z]{2}$/.test(code)))) return false;
 
     const tmdbId = metadata.identity.tmdbId;
     const hasValidTmdbId = typeof tmdbId === 'number' && Number.isSafeInteger(tmdbId) && tmdbId > 0;

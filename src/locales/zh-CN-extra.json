@@ -105,5 +105,9 @@
     "SETTINGS_ENABLED": "已启用",
     "DISCOVER_POPULAR": "热门",
     "DISCOVER_LATEST": "最新",
-    "DISCOVER_NO_MOVIES": "没有找到电影。"
+    "DISCOVER_NO_MOVIES": "没有找到电影。",
+    "COUNTRIES_LABEL": "国别",
+    "COUNTRIES_GROUP_western": "欧美",
+    "COUNTRIES_GROUP_eastAsian": "中日韩",
+    "COUNTRIES_GROUP_other": "其他国家和地区"
 }

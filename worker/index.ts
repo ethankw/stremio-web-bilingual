@@ -1,9 +1,10 @@
 import { isSupportedMediaId } from './identity';
 import { MetadataCache } from './cache';
-import { DEFAULT_REQUEST_BUDGET_MS, MAX_TMDB_RESPONSE_BYTES, TmdbFailure, resolveMetadata, resolvePeople } from './tmdb';
+import { DEFAULT_REQUEST_BUDGET_MS, MAX_TMDB_RESPONSE_BYTES, TmdbFailure, resolveMetadata, resolvePeople, resolveCountries } from './tmdb';
 import type {
     FetchFunction,
     PeopleMetadata,
+    CountryMetadata,
     MetadataIdentity,
     WorkerDependencies,
     WorkerEnv,
@@ -30,6 +31,7 @@ const QUERY_VALUE_LIMITS: Record<string, number> = {
 const KNOWN_API_ROUTES = new Set([
     '/api/health',
     '/api/bilingual/v1/people',
+    '/api/bilingual/v1/countries',
     '/api/bilingual/v1/meta',
     '/api/bilingual/v1/episode',
 ]);
@@ -194,6 +196,8 @@ const handleMetadata = async (
     dependencies: WorkerDependencies,
     people = false,
     peopleCache?: MetadataCache<PeopleMetadata>,
+    countries = false,
+    countryCache?: MetadataCache<CountryMetadata>,
 ): Promise<Response> => {
     if (env.BILINGUAL_METADATA_ENABLED !== 'true') {
         return errorResponse(503, 'METADATA_DISABLED', 'Bilingual metadata is disabled.');
@@ -205,7 +209,8 @@ const handleMetadata = async (
     }
 
     const key = cacheKey(identity);
-    const cached = people ? peopleCache?.get(key) ?? null : cache.get(key);
+    const resourceCache = countries ? countryCache : people ? peopleCache : cache;
+    const cached = resourceCache?.get(key) ?? null;
     if (cached !== null) {
         return responseFromSerializedJson(cached);
     }
@@ -220,6 +225,11 @@ const handleMetadata = async (
             setTimeout: dependencies.setTimeout,
             clearTimeout: dependencies.clearTimeout,
         };
+        if (countries && countryCache) {
+            const result = await resolveCountries(identity, token, resolverDependencies);
+            countryCache.set(key, result);
+            return responseFromJson(result);
+        }
         if (people && peopleCache) {
             const credits = await resolvePeople(identity, token, resolverDependencies);
             peopleCache.set(key, credits);
@@ -227,6 +237,9 @@ const handleMetadata = async (
         }
         const metadata = await resolveMetadata(identity, token, resolverDependencies);
         cache.set(key, metadata);
+        if (countryCache && Array.isArray(metadata.productionCountries)) {
+            countryCache.set(key, { schemaVersion: 1, identity: metadata.identity, matchStatus: metadata.matchStatus, productionCountries: metadata.productionCountries });
+        }
         return responseFromJson(metadata);
     } catch (error) {
         if (error instanceof TmdbFailure) {
@@ -241,6 +254,7 @@ export const createWorker = (dependencies: WorkerDependencies = {}): WorkerHandl
     const upstreamFetch: FetchFunction = dependencies.fetch || globalThis.fetch.bind(globalThis);
     const now = asClockNumber(dependencies.clock);
     const cache = new MetadataCache(now);
+    const countryCache = new MetadataCache<CountryMetadata>(now, 600, 256 * 1024);
     const peopleCache = new MetadataCache<PeopleMetadata>(now, 64, 128 * 1024);
 
     const handler: WorkerFetch = async (request, env) => {
@@ -258,7 +272,7 @@ export const createWorker = (dependencies: WorkerDependencies = {}): WorkerHandl
             return healthResponse(url, env);
         }
 
-        if (url.pathname !== '/api/bilingual/v1/meta' && url.pathname !== '/api/bilingual/v1/episode' && url.pathname !== '/api/bilingual/v1/people') {
+        if (url.pathname !== '/api/bilingual/v1/meta' && url.pathname !== '/api/bilingual/v1/episode' && url.pathname !== '/api/bilingual/v1/people' && url.pathname !== '/api/bilingual/v1/countries') {
             return errorResponse(404, 'NOT_FOUND', 'Not found.');
         }
 
@@ -268,7 +282,7 @@ export const createWorker = (dependencies: WorkerDependencies = {}): WorkerHandl
             return errorResponse(400, 'INVALID_REQUEST', 'Invalid request.');
         }
 
-        return handleMetadata(env, identity, upstreamFetch, cache, now, dependencies, url.pathname.endsWith('/people'), peopleCache);
+        return handleMetadata(env, identity, upstreamFetch, cache, now, dependencies, url.pathname.endsWith('/people'), peopleCache, url.pathname.endsWith('/countries'), countryCache);
     };
 
     return Object.assign(handler, { fetch: handler });

@@ -23,6 +23,9 @@ const { canonicalCreditGroups } = require('./MetaLinks/people');
 const usePeople = require('./MetaLinks/usePeople');
 const MetaPreviewPlaceholder = require('./MetaPreviewPlaceholder');
 const styles = require('./styles');
+const useProductionCountries = require('stremio/common/useProductionCountries');
+const { countryName } = require('stremio/common/productionCountries');
+const countryStyles = require('./MetaLinks/styles');
 const { Ratings } = require('./Ratings');
 const { useBilingualMetadata } = require('stremio/common/bilingual');
 const { BilingualTitle, BilingualOverview } = require('stremio/components/BilingualMetadata');
@@ -35,8 +38,13 @@ const ALLOWED_LINK_REDIRECTS = [
 
 // Personal bilingual display only: original metadata and actions stay unchanged.
 const MetaPreview = React.forwardRef(({ className, compact, name, logo, background, runtime, releaseInfo, released, description, deepLinks, links, trailerStreams, inLibrary, toggleInLibrary, watched, toggleWatched, ratingInfo, metadata, children, actions, showIcon = 'play', onShowClick, bilingualIdentity, bilingualEpisode, bilingualEpisodeName, bilingualEpisodeOverview }, ref) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const bilingual = useBilingualMetadata(bilingualIdentity, { priority: 0 });
+    const countries = useProductionCountries(bilingualIdentity, bilingual.metadata, bilingual.enabled && ['idle', 'loading'].includes(bilingual.status));
+    const countryChips = countries?.length ? <div className={classnames(styles['meta-links'], countryStyles['meta-links-container'])} data-production-countries={countries.join(',')}>
+        <div className={countryStyles['label-container']}>{t('COUNTRIES_LABEL')}</div>
+        <div className={countryStyles['links-container']}>{countries.map((code) => <span className={countryStyles['link-container']} key={code}>{countryName(code, i18n.language)}</span>)}</div>
+    </div> : null;
     const episodeBilingual = useBilingualMetadata(bilingualEpisode, { priority: 0 });
     const people = usePeople(bilingualIdentity, bilingual.enabled && bilingual.metadata?.matchStatus === 'matched');
     const displayBilingual = bilingualEpisode ? episodeBilingual : bilingual;
@@ -214,16 +222,19 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                                 category !== CONSTANTS.WRITERS_LINK_CATEGORY &&
                                 category !== 'Cast' && category !== 'Directors';
                         })
-                        .map((category, index) => (
-                            <MetaLinks
-                                key={index}
-                                className={styles['meta-links']}
-                                label={category}
-                                links={linksGroups.get(category)}
-                                people={people}
-                            />
+                        .map((category) => (
+                            <React.Fragment key={category}>
+                                <MetaLinks
+                                    className={styles['meta-links']}
+                                    label={category}
+                                    links={linksGroups.get(category)}
+                                    people={people}
+                                />
+                                {category === 'Genres' ? countryChips : null}
+                            </React.Fragment>
                         ))
                 }
+                {!linksGroups.has('Genres') ? countryChips : null}
                 {
                     bilingual.enabled ?
                         <div className={styles['description-container']}>

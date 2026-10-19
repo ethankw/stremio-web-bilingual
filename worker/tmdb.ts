@@ -7,6 +7,7 @@ import type {
     MetadataIdentity,
     SupportedType,
     PeopleMetadata,
+    CountryMetadata,
 } from './types';
 
 export const TMDB_ORIGIN = 'https://api.themoviedb.org';
@@ -494,6 +495,7 @@ const resolveMovieOrSeries = async (
     const translations = await translationsOrEmpty(translationsUrl, tmdbId, options, deadline);
     const metadata = createMetadata(identity, 'matched', tmdbId, nowAsIso(options.now), buildFields(identity, details, translations));
     metadata.artwork = englishArtwork(details.images);
+    metadata.productionCountries = productionCountries(details.production_countries);
     return metadata;
 };
 
@@ -635,6 +637,40 @@ export const resolvePeople = async (identity: MetadataIdentity, token: string, d
         };
         payload.cast.slice(0, 100).forEach((person) => append(person, 'cast'));
         payload.crew.filter((person) => isRecord(person) && person.job === 'Director').slice(0, 20).forEach((person) => append(person, 'director'));
+        return result;
+    } catch (error) {
+        if (error instanceof TmdbFailure && error.kind === 'not-found') return result;
+        throw error;
+    }
+};
+
+// Production geography only: never infer it from language or release markets.
+export const productionCountries = (value: unknown): string[] => Array.isArray(value) && value.length <= 50
+    ? [...new Set(value.filter(isRecord).map((country) => country.iso_3166_1)
+        .filter((code): code is string => typeof code === 'string' && /^[A-Z]{2}$/.test(code)))]
+    : [];
+
+export const resolveCountries = async (identity: MetadataIdentity, token: string, dependencies: TmdbDependencies): Promise<CountryMetadata> => {
+    const { options, deadline } = requestOptions(token, dependencies);
+    const result: CountryMetadata = {
+        schemaVersion: 1,
+        identity: { stremioType: identity.type, stremioId: identity.id, tmdbId: null },
+        matchStatus: 'unmatched', productionCountries: [],
+    };
+    try {
+        const directId = tmdbIdFrom(identity.id);
+        const candidates = directId === null ? candidateId(await requestJson(findUrl(identity.id), options, deadline), identity.type) : [directId];
+        if (candidates.length !== 1) {
+            result.matchStatus = candidates.length > 1 ? 'ambiguous' : 'unmatched';
+            return result;
+        }
+        const id = candidates[0];
+        const url = identity.type === 'movie' ? movieDetailsUrl(id) : tvDetailsUrl(id);
+        const details = validateDetails(await requestJson(url, options, deadline), id);
+        if (details === null) return result;
+        result.identity.tmdbId = id;
+        result.matchStatus = 'matched';
+        result.productionCountries = productionCountries(details.production_countries);
         return result;
     } catch (error) {
         if (error instanceof TmdbFailure && error.kind === 'not-found') return result;

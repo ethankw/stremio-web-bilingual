@@ -24,6 +24,8 @@ const { default: Guide } = require('./Guide');
 const { default: DaySelector } = require('./Guide/DaySelector');
 const { default: useLiveTvGuide } = require('./useLiveTvGuide');
 const styles = require('./styles');
+const CountryFilters = require('./CountryFilters');
+const useCountryFilter = require('./useCountryFilter');
 const useSavedBoolean = require('stremio/common/useSavedBoolean');
 
 const SCROLL_TO_BOTTOM_THRESHOLD = 400;
@@ -51,7 +53,13 @@ const Discover = () => {
     const core = useCore();
     const { navigateWithOrigin } = useNavigateWithOrigin();
     const routeActive = useRouteActive();
-    const [discover, loadNextPage] = useDiscover(urlParams, catalogQueryParams);
+    const [unfilteredDiscover, loadNextPage] = useDiscover(urlParams, catalogQueryParams);
+    const countryItems = React.useMemo(() => unfilteredDiscover.catalog?.content.type === 'Ready' ? unfilteredDiscover.catalog.content.content : [], [unfilteredDiscover.catalog]);
+    const countryFilter = useCountryFilter(countryItems, routeActive && !!unfilteredDiscover.aggregate);
+    const discover = React.useMemo(() => unfilteredDiscover.aggregate && unfilteredDiscover.catalog?.content.type === 'Ready' ? {
+        ...unfilteredDiscover,
+        catalog: { ...unfilteredDiscover.catalog, content: { ...unfilteredDiscover.catalog.content, content: countryFilter.items } },
+    } : unfilteredDiscover, [unfilteredDiscover, countryFilter.items]);
     const [selectInputs, hasNextPage] = useSelectableInputs(discover);
     const [filtersOpen, openFilters, closeFilters] = useBinaryState(false);
     const genreInput = selectInputs.find(({ id }) => id === 'extra:genre');
@@ -441,6 +449,7 @@ const Discover = () => {
                             >{option.label}</button>
                         ))}
                     </div>}
+                    {discover.aggregate && <CountryFilters excluded={countryFilter.excluded} toggle={countryFilter.toggle} />}
                     {!isEpgLayout && <div className={styles['watched-controls']}>
                         <button type={'button'} role={'switch'} aria-checked={hideWatched} className={styles['watched-switch']} onClick={toggleHideWatched}>
                             <span className={styles['watched-switch-track']} aria-hidden={true}><span /></span>

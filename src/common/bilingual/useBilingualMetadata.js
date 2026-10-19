@@ -3,6 +3,7 @@
 
 const React = require('react');
 const { getBilingualClient, getRequestKey, normalizeIdentity } = require('./client');
+const { countryClient } = require('../productionCountriesClient');
 const { useBilingualSettings } = require('./settings');
 
 const useBilingualMetadata = (identity, options = {}) => {
@@ -44,7 +45,12 @@ const useBilingualMetadata = (identity, options = {}) => {
         const subscription = client.subscribe(normalizedIdentity, {
             priority,
             autoStart: false,
-            onChange: (nextResult) => setResultState({ key: identityKey, ...nextResult }),
+            onChange: (nextResult) => {
+                if (normalizedIdentity.scope === 'meta' && Array.isArray(nextResult.metadata?.productionCountries)) {
+                    countryClient.seed(normalizedIdentity, nextResult.metadata.productionCountries);
+                }
+                setResultState({ key: identityKey, ...nextResult });
+            },
         });
         subscriptionRef.current = subscription;
         subscriptionKeyRef.current = identityKey;
