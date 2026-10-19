@@ -23,7 +23,7 @@ const map = (discover) => ({
         discover.catalog
 });
 
-const useDiscover = (urlParams, queryParams) => {
+const useDiscover = (urlParams, queryParams, filters) => {
     const core = useCore();
     const loadNextPage = React.useCallback(() => {
         core.transport.dispatch({
@@ -33,7 +33,7 @@ const useDiscover = (urlParams, queryParams) => {
             }
         }, 'discover');
     }, []);
-    const aggregated = !urlParams.type || urlParams.type === 'movie';
+    const aggregated = !urlParams.type || ['movie', 'series'].includes(urlParams.type);
     const action = React.useMemo(() => {
         if (aggregated) return null;
         if (typeof urlParams.transportUrl === 'string' && typeof urlParams.type === 'string' && typeof urlParams.catalogId === 'string') {
@@ -72,7 +72,7 @@ const useDiscover = (urlParams, queryParams) => {
         };
     }, [urlParams, queryParams, aggregated]);
     const discover = useModelState({ model: 'discover', action, map, deps: ['ctx'] });
-    const visible = useAggregatedDiscover(core, discover, urlParams, queryParams);
+    const visible = useAggregatedDiscover(core, discover, urlParams, queryParams, filters);
     return [visible, loadNextPage];
 };
 

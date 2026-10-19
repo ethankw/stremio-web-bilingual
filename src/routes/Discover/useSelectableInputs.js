@@ -32,7 +32,7 @@ const mapSelectableInputs = (discover, t, navigate) => {
         options: discover.selectable.catalogs
             .map(({ id, name, addon, deepLinks }) => ({
                 value: deepLinks.discover,
-                label: discover.aggregate ? t.string(id === 'popular' ? 'DISCOVER_POPULAR' : 'DISCOVER_LATEST') : t.catalogTitle({ addon, id, name }),
+                label: discover.aggregate ? t.string(id === 'all' ? 'TYPE_ALL' : id === 'popular' ? 'DISCOVER_POPULAR' : 'DISCOVER_LATEST') : t.catalogTitle({ addon, id, name }),
                 description: addon.manifest.name,
                 title: `${name} (${addon.manifest.name})`
             })),
@@ -43,7 +43,7 @@ const mapSelectableInputs = (discover, t, navigate) => {
             ? () => {
                 const selectableCatalog = discover.selectable.catalogs
                     .find(({ selected }) => selected);
-                return discover.aggregate ? t.string(discover.aggregate.kind === 'popular' ? 'DISCOVER_POPULAR' : 'DISCOVER_LATEST') : selectableCatalog ? t.catalogTitle(selectableCatalog, false) : discover.selected.request.path.id;
+                return discover.aggregate ? t.string(discover.aggregate.kind === 'all' ? 'TYPE_ALL' : discover.aggregate.kind === 'popular' ? 'DISCOVER_POPULAR' : 'DISCOVER_LATEST') : selectableCatalog ? t.catalogTitle(selectableCatalog, false) : discover.selected.request.path.id;
             }
             :
             t.string('SELECT_CATALOG'),

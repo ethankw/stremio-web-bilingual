@@ -24,6 +24,7 @@ const { default: Guide } = require('./Guide');
 const { default: DaySelector } = require('./Guide/DaySelector');
 const { default: useLiveTvGuide } = require('./useLiveTvGuide');
 const styles = require('./styles');
+const useDiscoverFilters = require('./useDiscoverFilters');
 const useCountryFilter = require('./useCountryFilter');
 const useSavedBoolean = require('stremio/common/useSavedBoolean');
 
@@ -52,7 +53,8 @@ const Discover = () => {
     const core = useCore();
     const { navigateWithOrigin } = useNavigateWithOrigin();
     const routeActive = useRouteActive();
-    const [unfilteredDiscover, loadNextPage] = useDiscover(urlParams, catalogQueryParams);
+    const discoveryFilters = useDiscoverFilters(urlParams, catalogQueryParams);
+    const [unfilteredDiscover, loadNextPage] = useDiscover(urlParams, catalogQueryParams, discoveryFilters);
     const countryItems = React.useMemo(() => unfilteredDiscover.catalog?.content.type === 'Ready' ? unfilteredDiscover.catalog.content.content : [], [unfilteredDiscover.catalog]);
     const countryFilter = useCountryFilter(countryItems, routeActive && !!unfilteredDiscover.aggregate);
     const discover = React.useMemo(() => unfilteredDiscover.aggregate && unfilteredDiscover.catalog?.content.type === 'Ready' ? {
@@ -390,7 +392,21 @@ const Discover = () => {
             <div className={styles['discover-content']}>
                 <div className={styles['catalog-container']}>
                     <div className={classnames(styles['selectable-inputs-container'], { [styles['epg-inputs']]: isEpgLayout })}>
-                        {isMobile ? <div className={styles['mobile-filters']}>
+                        {discover.aggregate ? <div className={styles['primary-filter-chips']}>
+                            <div role={'group'} aria-label={t('TYPE')} className={styles['chip-group']}>
+                                {['movie', 'series'].map((mediaType) => <button key={mediaType} type={'button'} className={styles['genre-chip']} data-media-type={mediaType}
+                                    aria-pressed={discoveryFilters.types.includes(mediaType)}
+                                    onClick={() => discoveryFilters.update({ types: discoveryFilters.types.includes(mediaType) ? discoveryFilters.types.filter((value) => value !== mediaType) : [...discoveryFilters.types, mediaType] })}>
+                                    {t(`TYPE_${mediaType}`)}
+                                </button>)}
+                            </div>
+                            <div role={'group'} aria-label={t('CATALOG')} className={styles['chip-group']}>
+                                {['all', 'popular', 'latest'].map((kind) => <button key={kind} type={'button'} className={styles['genre-chip']} data-catalog-kind={kind}
+                                    aria-pressed={discoveryFilters.kind === kind} onClick={() => discoveryFilters.update({ kind })}>
+                                    {t(kind === 'all' ? 'TYPE_ALL' : kind === 'popular' ? 'DISCOVER_POPULAR' : 'DISCOVER_LATEST')}
+                                </button>)}
+                            </div>
+                        </div> : isMobile ? <div className={styles['mobile-filters']}>
                             <div className={styles['catalog-summary']}>
                                 <div className={styles['catalog-type']}>{selectedTypeOption?.label ?? t('SELECT_TYPE')}</div>
                                 <div className={styles['catalog-name']} title={selectedCatalogOption?.label}>{selectedCatalogOption?.label ?? t('SELECT_CATALOG')}</div>
