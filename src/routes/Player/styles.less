@@ -162,3 +162,19 @@ html:not(.active-slider-within) {
         }
     }
 }
+
+// YouTube keeps branding/overlays inside its cross-origin iframe even with
+// controls=0. Give our controls a separate strip instead of drawing over them.
+.player-container.youtube-player {
+    .layer.video-layer {
+        bottom: calc(8rem + var(--safe-area-inset-bottom));
+    }
+
+    .layer.control-bar-layer {
+        background-color: @background-color;
+
+        &::before {
+            display: none;
+        }
+    }
+}

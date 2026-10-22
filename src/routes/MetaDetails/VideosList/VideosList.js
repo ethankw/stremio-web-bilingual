@@ -8,6 +8,7 @@ const { useCore } = require('stremio/core');
 const { useProfile } = require('stremio/common');
 const { Image, SearchBar, Toggle, Video } = require('stremio/components');
 const SeasonsBar = require('./SeasonsBar');
+const { defaultSeason } = require('../seriesSelection');
 const { default: EpisodePicker } = require('../EpisodePicker');
 const styles = require('./styles');
 
@@ -34,28 +35,7 @@ const VideosList = ({ className, metaItem, libraryItem, season, seasonOnSelect, 
             })
             .sort((a, b) => (a || Number.MAX_SAFE_INTEGER) - (b || Number.MAX_SAFE_INTEGER));
     }, [videos]);
-    const selectedSeason = React.useMemo(() => {
-        if (seasons.includes(season)) {
-            return season;
-        }
-
-        const video = videos?.find((video) => video.id === libraryItem?.state.video_id);
-
-        if (video && video.season && seasons.includes(video.season)) {
-            return video.season;
-        }
-
-        const nonSpecialSeasons = seasons.filter((season) => season !== 0);
-        if (nonSpecialSeasons.length > 0) {
-            return nonSpecialSeasons[0];
-        }
-
-        if (seasons.length > 0) {
-            return seasons[0];
-        }
-
-        return null;
-    }, [seasons, season, videos, libraryItem]);
+    const selectedSeason = React.useMemo(() => defaultSeason(seasons, videos, season, libraryItem?.state?.video_id), [seasons, season, videos, libraryItem]);
     const videosForSeason = React.useMemo(() => {
         return videos
             .filter((video) => {

@@ -208,7 +208,7 @@ const Discover = () => {
         }
 
         const index = Number(event.currentTarget.dataset.index);
-        const href = Number.isInteger(index) && index >= 0 ? getMetaDetailsHref(loadedItems[index]?.deepLinks) : null;
+        const href = Number.isInteger(index) && index >= 0 ? getMetaDetailsHref(loadedItems[index]?.deepLinks, loadedItems[index]?.type === 'series') : null;
         event.preventDefault();
         if (typeof href === 'string') {
             navigateWithOrigin(href);
@@ -371,7 +371,7 @@ const Discover = () => {
     const pendingHrefRef = React.useRef(null);
     const onMobileShowClick = React.useCallback((event) => {
         event.preventDefault();
-        pendingHrefRef.current = getMetaDetailsHref(selectedMetaItem && selectedMetaItem.deepLinks);
+        pendingHrefRef.current = getMetaDetailsHref(selectedMetaItem?.deepLinks, selectedMetaItem?.type === 'series');
         closeMobilePreview();
     }, [selectedMetaItem, closeMobilePreview]);
     const onMobilePreviewExited = React.useCallback(() => {

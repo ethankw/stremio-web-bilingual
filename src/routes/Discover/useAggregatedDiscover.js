@@ -5,6 +5,8 @@ const { useProfile } = require('stremio/common');
 const { useRouteActive } = require('stremio/common/useRouteFocused');
 const { getSources, imdbId, normalizeItem, mergeItems, createCatalogPager } = require('./aggregateCatalogs');
 
+const { createDiscoverItemState } = require('./discoverItemState');
+
 const canonicalCache = new Map();
 const { filterHref } = require('./discoverFilters');
 const metadataKey = (item) => `${item.type}|${imdbId(item) || item.id}`;
@@ -70,27 +72,30 @@ const useAggregatedDiscover = (core, raw, urlParams, queryParams, filters) => {
     const types = React.useMemo(() => typesKey ? typesKey.split(',') : [], [typesKey]);
     const genre = filters.genre;
     const href = React.useCallback((nextKind, nextGenre = genre) => filterHref({ types, kind: nextKind, genre: nextGenre }), [types, genre]);
+    const accountKey = profile.auth?.user?._id || null;
+    const itemStateRef = React.useRef(null);
+    if (!itemStateRef.current || itemStateRef.current.accountKey !== accountKey || itemStateRef.current.active !== active) {
+        itemStateRef.current = { accountKey, active, store: createDiscoverItemState() };
+    }
+    const itemState = itemStateRef.current.store;
+    const [stateRevision, updateItemState] = React.useReducer((value) => value + 1, 0);
     const [revision, refresh] = React.useReducer((value) => value + 1, 0);
     const [result, setResult] = React.useState(null);
     const resultRef = React.useRef(result);
     resultRef.current = result;
     const sessionRef = React.useRef(null);
-    const requestKey = `${addonsKey}|${typesKey}|${kind}|${genre || ''}`;
+    const requestKey = `${accountKey || 'guest'}|${addonsKey}|${typesKey}|${kind}|${genre || ''}`;
     const sources = React.useMemo(() => getSources(addons, kind, new Date(), types, genre), [addons, kind, types, genre]);
     const selected = React.useMemo(() => ({ request: { base: 'unified', path: { resource: 'catalog', type: types[0] || 'movie', id: kind, extra: genre ? [['genre', genre]] : [] } } }), [kind, genre, types]);
 
     React.useEffect(() => {
         if (!enabled || !active) return undefined;
-        let timer;
-        const onState = (models) => {
-            if (models.includes('ctx')) {
-                clearTimeout(timer);
-                timer = setTimeout(refresh, 250);
-            }
+        const onEvent = (event, args) => {
+            if (itemState.receive(event, args)) updateItemState();
         };
-        core.on('state', onState);
-        return () => { clearTimeout(timer); core.off('state', onState); };
-    }, [enabled, active, core]);
+        core.on('event', onEvent);
+        return () => core.off('event', onEvent);
+    }, [enabled, active, core, itemState]);
 
     React.useEffect(() => {
         if (!enabled || !active) return undefined;
@@ -134,7 +139,7 @@ const useAggregatedDiscover = (core, raw, urlParams, queryParams, filters) => {
             controller.abort();
             if (sessionRef.current === session) sessionRef.current = null;
         };
-    }, [enabled, active, core, addons, kind, sources, requestKey, revision]);
+    }, [enabled, active, core, addons, kind, sources, requestKey, revision, accountKey]);
     const loadNextPage = React.useCallback(() => { void sessionRef.current?.loadNextPage(); }, []);
 
     const current = result?.key === requestKey ? result : null;
@@ -150,7 +155,10 @@ const useAggregatedDiscover = (core, raw, urlParams, queryParams, filters) => {
         return [...new Set([...declared, ...(genre ? [genre] : []), ...(current?.items || []).flatMap((item) => item.aggregateGenres || [])])].sort();
     }, [addons, current?.items, types, genre]);
     const extra = React.useMemo(() => [{ name: 'genre', isRequired: false, options: [null, ...genres].map((value) => ({ value, selected: value === genre, deepLinks: { discover: href(kind, value) } })) }], [genres, genre, kind, href]);
-    const visible = React.useMemo(() => (current?.items || []).filter((item) => !genre || item.aggregateGenres?.includes(genre)).map((item) => ({ ...item, released: new Date(item.released || NaN) })), [current?.items, genre]);
+    // Successful receipts mutate this controller without replacing it; the
+    // revision must invalidate the projected cards even during a slow page load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const visible = React.useMemo(() => (current?.items || []).filter((item) => !genre || item.aggregateGenres?.includes(genre)).map((item) => ({ ...itemState.apply(item), released: new Date(item.released || NaN) })), [current?.items, genre, itemState, stateRevision]);
     const aggregated = React.useMemo(() => ({
         ...raw,
         selected,

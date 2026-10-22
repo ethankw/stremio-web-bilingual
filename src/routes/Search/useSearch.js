@@ -3,9 +3,13 @@
 const React = require('react');
 const { useCore } = require('stremio/core');
 const { useModelState } = require('stremio/common');
+const { useRouteActive } = require('stremio/common/useRouteFocused');
+const searchRanges = require('./searchRanges');
 
 const useSearch = (queryParams) => {
     const core = useCore();
+    const active = useRouteActive();
+    const startedRef = React.useRef(null);
     // TODO: refactor this to be in stremio-core-web
     // React.useEffect(() => {
     //     let timerId = setTimeout(emitSearchEvent, 500);
@@ -61,6 +65,19 @@ const useSearch = (queryParams) => {
         }, 'search');
     }, []);
     const search = useModelState({ model: 'search', action });
+    const query = queryParams.get('search') ?? queryParams.get('query');
+    const selectedQuery = search.selected?.extra?.find(([name]) => name === 'search')?.[1];
+    const catalogKey = JSON.stringify((search.catalogs || []).map((catalog) => [catalog.type, catalog.id, catalog.addon?.transportUrl]));
+    React.useEffect(() => {
+        if (!active || !query) { startedRef.current = null; return; }
+        if (selectedQuery !== query) return;
+        const key = `${query}|${catalogKey}`;
+        if (startedRef.current === key) return;
+        startedRef.current = key;
+        // Start film and series searches together, including rows below the fold.
+        // Core delivers each provider independently; no slowest-provider barrier.
+        for (const range of searchRanges(JSON.parse(catalogKey).map(([type]) => ({ type })))) loadRange(range);
+    }, [active, query, selectedQuery, catalogKey, loadRange]);
     return [search, loadRange];
 };
 
