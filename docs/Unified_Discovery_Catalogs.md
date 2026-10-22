@@ -38,3 +38,11 @@
 ## 2026-10-19 分页修复回滚
 
 修复前稳定源码为 cbb5665adaf6058cc94c365d153d191e193768a6，Worker 版本为 2c53b7b7-142f-4d32-8106-ef2077de0921。需要回滚时使用本项目配置：`pnpm exec wrangler rollback 2c53b7b7-142f-4d32-8106-ef2077de0921 --config wrangler.personal.jsonc --message "Restore Discover before progressive pagination" --yes`。不修改账号、插件、观看记录或字幕偏好。
+
+## 2026-10-22 片库和观看状态
+
+不再因任意 ctx 状态事件重建目录分页会话。订阅 Core 的 LibraryItemAdded / LibraryItemRemoved / LibraryItemMarkedAsWatched 成功事件，仅覆盖匹配影片的 inLibrary / watched；IMDb、映射后的 TMDB 和原始影片 ID 均可匹配。同一字段以最新成功事件为准，晚到的旧目录页面不能覆盖新操作。账号变化或离开页面清空该覆盖层，不持久化任何登录信息。不提前假定写入成功，失败由现有 Core 错误处理显示。
+
+新打开剧集的浏览卡片优先进入季集列表，正片季优先；明确选择的季/集（包括第 0 季）和继续播放入口保留。剧集禁用插件默认视频的自动猜测；手动集数搜索没有季信息时从 S1E1 开始。YouTube iframe 与应用控制栏分区，避免品牌、分享提示和应用按钮重叠。电影/剧集搜索目录不依赖视口才启动，各来源独立返回；不保证外部服务的响应时间。
+
+本次修复前版本为 415cb4db-3987-4f4e-9ae7-bf16d43c638c，源码 51c04f30b4ab20240ea96ba3fcc4a109ceb2eaeb。回滚：`pnpm exec wrangler rollback 415cb4db-3987-4f4e-9ae7-bf16d43c638c --config wrangler.personal.jsonc --message "Restore before interaction fixes" --yes`。

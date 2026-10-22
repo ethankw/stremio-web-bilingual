@@ -5,6 +5,7 @@ import { useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Button, NumberInput } from 'stremio/components';
 import styles from './EpisodePicker.less';
+const { episodeCoordinates } = require('../seriesSelection');
 
 type Props = {
     className?: string,
@@ -22,11 +23,8 @@ const EpisodePicker = ({ className, onSubmit }: Props) => {
             splitPath.pop();
         }
         const videoId = decodeURIComponent(splitPath[splitPath.length - 1]);
-        const [, pathSeason, pathEpisode] = videoId ? videoId.split(':') : [];
-        return {
-            initialSeason: parseInt(pathSeason) || 0,
-            initialEpisode: parseInt(pathEpisode) || 1
-        };
+        const coordinates = episodeCoordinates(videoId);
+        return { initialSeason: coordinates.season, initialEpisode: coordinates.episode };
     }, []);
 
     const [season, setSeason] = useState(initialSeason);

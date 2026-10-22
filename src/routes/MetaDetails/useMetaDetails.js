@@ -57,7 +57,8 @@ const useMetaDetails = (urlParams) => {
                             }
                             :
                             null,
-                        guessStream: true,
+                        // Series default to their episode list, never an addon-guessed special.
+                        guessStream: urlParams.type !== 'series',
                     }
                 }
             };

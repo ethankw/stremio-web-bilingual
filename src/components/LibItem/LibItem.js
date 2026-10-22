@@ -14,7 +14,7 @@ const LibItem = ({ _id, removable, notifications, watched, detailsVideosFirst, .
     const navigate = useNavigate();
     const { navigateWithOrigin } = useNavigateWithOrigin();
     const core = useCore();
-    const detailsHref = React.useMemo(() => getMetaDetailsHref(props.deepLinks, detailsVideosFirst), [props.deepLinks, detailsVideosFirst]);
+    const detailsHref = React.useMemo(() => getMetaDetailsHref(props.deepLinks, detailsVideosFirst ?? props.type === 'series'), [props.deepLinks, detailsVideosFirst, props.type]);
     const playerHref = props.deepLinks && typeof props.deepLinks.player === 'string' ? props.deepLinks.player : null;
 
     const newVideos = React.useMemo(() => {

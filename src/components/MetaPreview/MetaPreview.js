@@ -14,6 +14,7 @@ const SharePrompt = require('stremio/components/SharePrompt');
 const CONSTANTS = require('stremio/common/CONSTANTS');
 const { default: useMediaQuery } = require('stremio/common/useMediaQuery');
 const screenSizes = require('stremio/common/screen-sizes.less');
+const { default: getMetaDetailsHref } = require('stremio/common/getMetaDetailsHref');
 const routesRegexp = require('stremio/common/routesRegexp');
 const useBinaryState = require('stremio/common/useBinaryState');
 const ActionButton = require('./ActionButton');
@@ -99,21 +100,7 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
     const linksGroups = React.useMemo(() => canonicalCreditGroups(originalLinksGroups, people, bilingual.enabled), [originalLinksGroups, people, bilingual.enabled]);
     const displayLogo = canonicalArtwork(bilingual.metadata, 'logo', logo, bilingual.enabled);
     const displayBackground = canonicalArtwork(bilingual.metadata, 'background', background, bilingual.enabled);
-    const showHref = React.useMemo(() => {
-        return deepLinks ?
-            typeof deepLinks.player === 'string' ?
-                deepLinks.player
-                :
-                typeof deepLinks.metaDetailsStreams === 'string' ?
-                    deepLinks.metaDetailsStreams
-                    :
-                    typeof deepLinks.metaDetailsVideos === 'string' ?
-                        deepLinks.metaDetailsVideos
-                        :
-                        null
-            :
-            null;
-    }, [deepLinks]);
+    const showHref = React.useMemo(() => typeof deepLinks?.player === 'string' ? deepLinks.player : getMetaDetailsHref(deepLinks, bilingualIdentity?.type === 'series'), [deepLinks, bilingualIdentity?.type]);
     const trailerHref = React.useMemo(() => {
         if (!Array.isArray(trailerStreams) || trailerStreams.length === 0) {
             return null;

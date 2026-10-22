@@ -964,14 +964,14 @@ const Player = () => {
     }, []);
 
     return (
-        <div ref={playerRef} className={classnames(styles['player-container'], { [styles['overlayHidden']]: overlayHidden })}
+        <div ref={playerRef} className={classnames(styles['player-container'], { [styles['youtube-player']]: typeof player.selected?.stream?.ytId === 'string' }, { [styles['overlayHidden']]: overlayHidden })}
             onMouseDown={onContainerMouseDown}
             onMouseMove={onContainerMouseMove}
             onMouseOver={onContainerMouseMove}
             onMouseLeave={onContainerMouseLeave}>
             <Video
                 ref={video.containerRef}
-                className={styles['layer']}
+                className={classnames(styles['layer'], styles['video-layer'])}
                 onClick={onVideoClick}
                 onDoubleClick={onVideoDoubleClick}
             />

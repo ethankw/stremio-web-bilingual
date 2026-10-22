@@ -32,8 +32,8 @@ const MetaItem = React.memo(({ className, type, releaseInfo, released, links, im
     const [menuOpen, onMenuOpen, onMenuClose] = useBinaryState(false);
     const { hoverProps, isHovered } = useHover({});
     const href = React.useMemo(() => {
-        return typeof customHref === 'string' ? customHref : getMetaDetailsHref(deepLinks);
-    }, [customHref, deepLinks]);
+        return typeof customHref === 'string' ? customHref : getMetaDetailsHref(deepLinks, type === 'series');
+    }, [customHref, deepLinks, type]);
     const metaItemOnClick = React.useCallback((event) => {
         if (typeof props.onClick === 'function') {
             props.onClick(event);
