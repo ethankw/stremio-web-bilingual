@@ -12,6 +12,7 @@ const { Button, Image, MultiselectMenu } = require('stremio/components');
 const { useCore } = require('stremio/core');
 const Stream = require('./Stream');
 const classifyStreamSource = require('./classifyStreamSource');
+const getStreamSwarmStats = require('./getStreamSwarmStats');
 const sortStreamsByQuality = require('./sortStreamsByQuality');
 const styles = require('./styles');
 const { usePlatform, useProfile } = require('stremio/common');
@@ -194,6 +195,7 @@ const StreamsList = ({ className, video, type, externalPlayerCallbackCanMarkWatc
                                             addonName={stream.addonName}
                                             name={stream.name}
                                             sourceClassification={type === 'movie' || type === 'series' ? classifyStreamSource(stream) : undefined}
+                                            swarmStats={type === 'movie' || type === 'series' ? getStreamSwarmStats(stream, stream.addonName) : null}
                                             description={stream.description}
                                             thumbnail={stream.thumbnail}
                                             progress={stream.progress}
