@@ -145,6 +145,32 @@
         color: var(--primary-foreground-color);
     }
 
+    .description-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .swarm-stats {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.3rem 0.9rem;
+        margin-top: 0.4rem;
+        font-size: 0.85rem;
+        white-space: normal;
+        font-variant-numeric: tabular-nums;
+
+        span {
+            font-weight: 500;
+        }
+
+        small {
+            font-size: 0.75rem;
+            opacity: 0.65;
+        }
+    }
+
     .icon {
         flex: none;
         width: 3rem;

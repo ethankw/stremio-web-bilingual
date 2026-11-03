@@ -112,5 +112,10 @@
     "Sci-Fi & Fantasy": "科幻与奇幻",
     "War & Politics": "战争与政治",
     "Soap": "肥皂剧",
-    "Talk": "访谈"
+    "Talk": "访谈",
+    "STREAM_SWARM_SEEDERS": "做种",
+    "STREAM_SWARM_LEECHERS": "下载中",
+    "STREAM_SWARM_UNAVAILABLE": "未提供",
+    "STREAM_SWARM_SNAPSHOT": "插件统计，可能有延迟",
+    "STREAM_SWARM_HINT": "插件报告的统计值，可能来自缓存。做种者持有完整文件；下载中节点持有部分文件。这不是当前连接人数，也不保证播放速度。"
 }

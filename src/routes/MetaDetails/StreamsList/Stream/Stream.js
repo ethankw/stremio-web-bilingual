@@ -13,7 +13,7 @@ const { default: useRouteFocused } = require('stremio/common/useRouteFocused');
 const StreamPlaceholder = require('./StreamPlaceholder');
 const styles = require('./styles');
 
-const Stream = ({ className = '', compact = false, isEpg = false, videoId = undefined, videoReleased = undefined, addonName, name, description, sourceClassification = undefined, thumbnail = undefined, progress, deepLinks, externalPlayerCallbackCanMarkWatched, ...props }) => {
+const Stream = ({ className = '', compact = false, isEpg = false, videoId = undefined, videoReleased = undefined, addonName, name, description, sourceClassification = undefined, swarmStats = null, thumbnail = undefined, progress, deepLinks, externalPlayerCallbackCanMarkWatched, ...props }) => {
     const profile = useProfile();
     const toast = useToast();
     const platform = usePlatform();
@@ -255,12 +255,19 @@ const Stream = ({ className = '', compact = false, isEpg = false, videoId = unde
                             null
                     }
                 </div>
-                <div className={styles['description-container']} title={description}>{description}</div>
+                <div className={styles['description-container']} title={description}>
+                    <div className={styles['description-text']}>{description}</div>
+                    {!isEpg && swarmStats && <div className={styles['swarm-stats']} title={t('STREAM_SWARM_HINT', { defaultValue: 'Addon-reported counts may be cached. Seeders hold a complete copy; leechers are still downloading. These are not live connections or a playback guarantee.' })}>
+                        <span>{t('STREAM_SWARM_SEEDERS', { defaultValue: 'Seeders' })}: {swarmStats.seeders ?? t('STREAM_SWARM_UNAVAILABLE', { defaultValue: 'Not provided' })}</span>
+                        <span>{t('STREAM_SWARM_LEECHERS', { defaultValue: 'Leechers' })}: {swarmStats.leechers ?? t('STREAM_SWARM_UNAVAILABLE', { defaultValue: 'Not provided' })}</span>
+                        <small>{t('STREAM_SWARM_SNAPSHOT', { defaultValue: 'Addon snapshot' })}</small>
+                    </div>}
+                </div>
                 <Icon className={styles['icon']} name={'play'} />
                 {children}
             </Button>
         );
-    }, [compact, thumbnail, progress, addonName, name, description, sourceClassification, href, target, download, onClick, menuOpen]);
+    }, [compact, thumbnail, progress, addonName, name, description, sourceClassification, swarmStats, isEpg, href, target, download, onClick, menuOpen]);
 
     const renderMenu = React.useMemo(() => function renderMenu() {
         return (
@@ -330,6 +337,7 @@ Stream.propTypes = {
     addonName: PropTypes.string,
     name: PropTypes.string,
     description: PropTypes.string,
+    swarmStats: PropTypes.shape({ seeders: PropTypes.number, leechers: PropTypes.number }),
     sourceClassification: PropTypes.shape({ kind: PropTypes.oneOf(['camera', 'digital', 'unknown']).isRequired, source: PropTypes.string }),
     thumbnail: PropTypes.string,
     progress: PropTypes.number,
